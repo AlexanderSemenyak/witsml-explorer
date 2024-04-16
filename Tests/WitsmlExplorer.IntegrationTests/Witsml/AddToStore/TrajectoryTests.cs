@@ -22,13 +22,16 @@ namespace WitsmlExplorer.IntegrationTests.Witsml.AddToStore
     {
         private readonly ITestOutputHelper _output;
         private readonly WitsmlClient _client;
-        private readonly WitsmlClientCapabilities _clientCapabilities = new();
 
         public TrajectoryTests(ITestOutputHelper output)
         {
             _output = output;
             WitsmlConfiguration config = ConfigurationReader.GetWitsmlConfiguration();
-            _client = new WitsmlClient(config.Hostname, config.Username, config.Password, _clientCapabilities);
+            _client = new WitsmlClient(options =>
+            {
+                options.Hostname = config.Hostname;
+                options.Credentials = new WitsmlCredentials(config.Username, config.Password);
+            });
         }
 
         [Fact(Skip = "Should only be run manually")]
@@ -99,7 +102,7 @@ namespace WitsmlExplorer.IntegrationTests.Witsml.AddToStore
                     AziRef = aziRef,
                     TrajectoryStations = tStations,
                     CommonData = commonData
-                }.AsSingletonList()
+                }.AsItemInList()
             };
 
             return trajectories;

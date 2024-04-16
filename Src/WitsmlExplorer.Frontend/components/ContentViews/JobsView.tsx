@@ -1,35 +1,63 @@
-import { Switch } from "@equinor/eds-core-react";
-import React, { ChangeEvent, useContext, useEffect, useState } from "react";
-import NavigationContext from "../../contexts/navigationContext";
-import OperationContext from "../../contexts/operationContext";
-import OperationType from "../../contexts/operationType";
-import JobInfo from "../../models/jobs/jobInfo";
-import { Server } from "../../models/server";
-import { adminRole, developerRole, getUserAppRoles, msalEnabled } from "../../msal/MsalAuthProvider";
-import JobService from "../../services/jobService";
-import NotificationService, { Notification } from "../../services/notificationService";
-import { getContextMenuPosition } from "../ContextMenus/ContextMenu";
-import JobInfoContextMenu, { JobInfoContextMenuProps } from "../ContextMenus/JobInfoContextMenu";
-import formatDateString from "../DateFormatter";
-import { ContentTable, ContentTableColumn, ContentType, Order } from "./table";
-import { clipLongString } from "./ViewUtils";
+import { Button, Icon, Switch, Typography } from "@equinor/eds-core-react";
+import {
+  ContentTable,
+  ContentTableColumn,
+  ContentType
+} from "components/ContentViews/table";
+import { getContextMenuPosition } from "components/ContextMenus/ContextMenu";
+import JobInfoContextMenu, {
+  JobInfoContextMenuProps
+} from "components/ContextMenus/JobInfoContextMenu";
+import formatDateString from "components/DateFormatter";
+import { ReportModal } from "components/Modals/ReportModal";
+import NavigationContext from "contexts/navigationContext";
+import OperationContext from "contexts/operationContext";
+import OperationType from "contexts/operationType";
+import JobInfo from "models/jobs/jobInfo";
+import BaseReport from "models/reports/BaseReport";
+import { Server } from "models/server";
+import {
+  adminRole,
+  developerRole,
+  getUserAppRoles,
+  msalEnabled
+} from "msal/MsalAuthProvider";
+import React, {
+  ChangeEvent,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+} from "react";
+import JobService from "services/jobService";
+import NotificationService, {
+  Notification
+} from "services/notificationService";
+import styled from "styled-components";
+import { Colors } from "styles/Colors";
 
 export const JobsView = (): React.ReactElement => {
   const { navigationState } = useContext(NavigationContext);
   const {
     dispatchOperation,
-    operationState: { timeZone }
+    operationState: { timeZone, colors, dateTimeFormat }
   } = useContext(OperationContext);
   const { servers, selectedServer } = navigationState;
   const [jobInfos, setJobInfos] = useState<JobInfo[]>([]);
+  const [lastFetched, setLastFetched] = useState<string>(
+    new Date().toLocaleTimeString()
+  );
   const [shouldRefresh, setShouldRefresh] = useState<boolean>(true);
   const [showAll, setShowAll] = useState(false);
 
   const fetchJobs = () => {
     const abortController = new AbortController();
     const getJobInfos = async () => {
-      const jobInfos = showAll ? JobService.getAllJobInfos(abortController.signal) : JobService.getUserJobInfos(abortController.signal);
+      const jobInfos = showAll
+        ? JobService.getAllJobInfos(abortController.signal)
+        : JobService.getUserJobInfos(abortController.signal);
       setJobInfos(await jobInfos);
+      setLastFetched(new Date().toLocaleTimeString());
     };
 
     getJobInfos();
@@ -41,13 +69,21 @@ export const JobsView = (): React.ReactElement => {
 
   useEffect(() => {
     const eventHandler = (notification: Notification) => {
-      const shouldFetch = notification.serverUrl.toString() === navigationState.selectedServer?.url;
+      const shouldFetch =
+        notification.serverUrl.toString().toLowerCase() ===
+        navigationState.selectedServer?.url?.toLowerCase();
       if (shouldFetch) {
         setShouldRefresh(true);
       }
     };
-    const unsubscribeOnSnackbar = NotificationService.Instance.snackbarDispatcherAsEvent.subscribe(eventHandler);
-    const unsubscribeOnAlert = NotificationService.Instance.alertDispatcherAsEvent.subscribe(eventHandler);
+    const unsubscribeOnSnackbar =
+      NotificationService.Instance.snackbarDispatcherAsEvent.subscribe(
+        eventHandler
+      );
+    const unsubscribeOnAlert =
+      NotificationService.Instance.alertDispatcherAsEvent.subscribe(
+        eventHandler
+      );
 
     return function cleanup() {
       unsubscribeOnSnackbar();
@@ -66,57 +102,140 @@ export const JobsView = (): React.ReactElement => {
     }
   }, [shouldRefresh]);
 
-  const onContextMenu = (event: React.MouseEvent<HTMLLIElement>, selectedItem: any) => {
+  const onContextMenu = (
+    event: React.MouseEvent<HTMLLIElement>,
+    selectedItem: any
+  ) => {
     const contextMenuProps: JobInfoContextMenuProps = {
       dispatchOperation,
       jobInfo: selectedItem.jobInfo,
       setShouldRefresh
     };
     const position = getContextMenuPosition(event);
-    dispatchOperation({ type: OperationType.DisplayContextMenu, payload: { component: <JobInfoContextMenu {...contextMenuProps} />, position } });
+    dispatchOperation({
+      type: OperationType.DisplayContextMenu,
+      payload: {
+        component: <JobInfoContextMenu {...contextMenuProps} />,
+        position
+      }
+    });
+  };
+
+  const onClickReport = (report: BaseReport) => {
+    const reportModalProps = { report };
+    dispatchOperation({
+      type: OperationType.DisplayModal,
+      payload: <ReportModal {...reportModalProps} />
+    });
   };
 
   const columns: ContentTableColumn[] = [
     { property: "startTime", label: "Start time", type: ContentType.DateTime },
     { property: "jobType", label: "Job Type", type: ContentType.String },
     { property: "wellName", label: "Well Name", type: ContentType.String },
-    { property: "wellboreName", label: "Wellbore Name", type: ContentType.String },
-    { property: "objectName", label: "Object Name(s)", type: ContentType.String },
+    {
+      property: "wellboreName",
+      label: "Wellbore Name",
+      type: ContentType.String
+    },
+    {
+      property: "objectName",
+      label: "Object Name(s)",
+      type: ContentType.String
+    },
     { property: "status", label: "Status", type: ContentType.String },
-    { property: "failedReason", label: "Failure Reason", type: ContentType.String },
-    { property: "targetServer", label: "Target Server", type: ContentType.String },
-    { property: "sourceServer", label: "Source Server", type: ContentType.String },
+    { property: "report", label: "Report", type: ContentType.Component },
+    {
+      property: "failedReason",
+      label: "Failure Reason",
+      type: ContentType.String
+    },
+    {
+      property: "targetServer",
+      label: "Target Server",
+      type: ContentType.String
+    },
+    {
+      property: "sourceServer",
+      label: "Source Server",
+      type: ContentType.String
+    },
     { property: "endTime", label: "Finish time", type: ContentType.DateTime },
     { property: "username", label: "Ordered by", type: ContentType.String }
   ];
 
-  const jobInfoRows = jobInfos.map((jobInfo) => {
-    return {
-      ...jobInfo,
-      failedReason: clipLongString(jobInfo.failedReason, 20, "-"),
-      wellName: clipLongString(jobInfo.wellName, 20, "-"),
-      wellboreName: clipLongString(jobInfo.wellboreName, 20, "-"),
-      objectName: clipLongString(jobInfo.objectName, 30, "-"),
-      startTime: formatDateString(jobInfo.startTime, timeZone),
-      endTime: formatDateString(jobInfo.endTime, timeZone),
-      targetServer: serverUrlToName(servers, jobInfo.targetServer),
-      sourceServer: serverUrlToName(servers, jobInfo.sourceServer),
-      jobInfo: jobInfo
-    };
-  });
+  const jobInfoRows = useMemo(
+    () =>
+      jobInfos
+        .map((jobInfo) => {
+          return {
+            ...jobInfo,
+            failedReason: jobInfo.failedReason,
+            wellName: jobInfo.wellName,
+            wellboreName: jobInfo.wellboreName,
+            objectName: jobInfo.objectName,
+            startTime: formatDateString(
+              jobInfo.startTime,
+              timeZone,
+              dateTimeFormat
+            ),
+            endTime: formatDateString(
+              jobInfo.endTime,
+              timeZone,
+              dateTimeFormat
+            ),
+            targetServer: serverUrlToName(servers, jobInfo.targetServer),
+            sourceServer: serverUrlToName(servers, jobInfo.sourceServer),
+            report: jobInfo.report ? (
+              <ReportButton onClick={() => onClickReport(jobInfo.report)}>
+                Report
+              </ReportButton>
+            ) : null,
+            jobInfo: jobInfo
+          };
+        })
+        .sort((obj1, obj2) => {
+          return obj2.startTime.localeCompare(obj1.startTime);
+        }),
+    [jobInfos]
+  );
+
+  const panelElements = [
+    <Button
+      key="refreshJobs"
+      aria-disabled={shouldRefresh ? true : false}
+      aria-label={shouldRefresh ? "loading data" : null}
+      onClick={shouldRefresh ? undefined : () => setShouldRefresh(true)}
+      disabled={shouldRefresh}
+      colors={colors}
+    >
+      <Icon name="refresh" />
+      Refresh
+    </Button>,
+    msalEnabled &&
+    (getUserAppRoles().includes(adminRole) ||
+      getUserAppRoles().includes(developerRole)) ? (
+      <StyledSwitch
+        colors={colors}
+        key="showAllUsersJobs"
+        label="Show all users' jobs"
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          setShowAll(e.target.checked);
+        }}
+      />
+    ) : null,
+    <Typography key="lastFetched">Last fetched: {lastFetched}</Typography>
+  ];
 
   return (
-    <>
-      {msalEnabled && (getUserAppRoles().includes(adminRole) || getUserAppRoles().includes(developerRole)) && (
-        <Switch
-          label="Show all users' jobs"
-          onChange={(e: ChangeEvent<HTMLInputElement>) => {
-            setShowAll(e.target.checked);
-          }}
-        />
-      )}
-      <ContentTable columns={columns} data={jobInfoRows} order={Order.Descending} onContextMenu={onContextMenu} />
-    </>
+    <ContentTable
+      viewId="jobsView"
+      columns={columns}
+      data={jobInfoRows}
+      onContextMenu={onContextMenu}
+      panelElements={panelElements}
+      downloadToCsvFileName="Jobs"
+    />
   );
 };
 
@@ -124,8 +243,21 @@ const serverUrlToName = (servers: Server[], url: string): string => {
   if (!url) {
     return "-";
   }
-  const server = servers.find((server) => server.url == url);
+  const server = servers.find(
+    (server) => server.url.toLowerCase() == url.toLowerCase()
+  );
   return server ? server.name : url;
 };
+
+const StyledSwitch = styled(Switch)<{ colors: Colors }>`
+  span {
+    color: ${(props) => props.colors.infographic.primaryMossGreen};
+    margin-left: 0;
+  }
+`;
+const ReportButton = styled.div`
+  text-decoration: underline;
+  cursor: pointer;
+`;
 
 export default JobsView;

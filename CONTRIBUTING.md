@@ -65,7 +65,7 @@ Change the configuration in `mysettings.json` to the following, so that the back
 {
   "LogQueries": false,
   "AllowedHosts": "*",
-  "Host": "http://localhost",
+  "AllowedOrigin": "http://localhost:3000",
   "MongoDb": {
     "Name": "witsml-explorer-db",
     "ConnectionString": "mongodb://<username>:<password>@localhost"
@@ -267,8 +267,8 @@ Verify successful deployment by accessing the url in browser or postman; Expect 
 #### Deploy Frontend
 Edit .env.local file in WitsmlExplorer.Frontend project and set these values
 ```
-	WITSMLEXPLORER_FRONTEND_URL=https://localhost/witsmlexplorer
-	WITSMLEXPLORER_API_URL=https://localhost/witsmlexplorerbackend
+	NEXT_PUBLIC_WITSMLEXPLORER_FRONTEND_URL=https://localhost/witsmlexplorer
+	NEXT_PUBLIC_WITSMLEXPLORER_API_URL=https://localhost/witsmlexplorerbackend
 ```
 
 Build and export the application to a folder. Eg.: C:\WE_Frontend

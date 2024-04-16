@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
+using Witsml;
 using Witsml.Data;
 using Witsml.Data.Curves;
 using Witsml.Extensions;
@@ -29,7 +30,11 @@ namespace WitsmlExplorer.Api.Query
                     StartDateTimeIndex = "",
                     EndDateTimeIndex = "",
                     CommonData = new WitsmlCommonData()
-                }.AsSingletonList()
+                    {
+                        DTimCreation = "",
+                        DTimLastChange = ""
+                    }
+                }.AsItemInList()
             };
         }
 
@@ -42,7 +47,22 @@ namespace WitsmlExplorer.Api.Query
                     Uid = logUid,
                     UidWell = wellUid,
                     UidWellbore = wellboreUid
-                }.AsSingletonList()
+                }.AsItemInList()
+            };
+        }
+
+        public static WitsmlLogs GetWitsmlLogsByIds(string wellUid, string wellboreUid, string[] logUids)
+        {
+            return new WitsmlLogs
+            {
+                Logs = logUids.Select(logUid =>
+                    new WitsmlLog
+                    {
+                        Uid = logUid,
+                        UidWell = wellUid,
+                        UidWellbore = wellboreUid
+                    }
+                ).ToList()
             };
         }
 
@@ -55,28 +75,29 @@ namespace WitsmlExplorer.Api.Query
             Index startIndex,
             Index endIndex)
         {
-            var queryLog = new WitsmlLog
+            WitsmlLog queryLog = new()
             {
                 Uid = logUid,
                 UidWell = wellUid,
                 UidWellbore = wellboreUid,
-                IndexType = "",
                 LogCurveInfo = new List<WitsmlLogCurveInfo>(),
                 LogData = new WitsmlLogData
                 {
-                    MnemonicList = string.Join(",", mnemonics)
+                    MnemonicList = string.Join(CommonConstants.DataSeparator, mnemonics)
                 }
             };
 
             switch (indexType)
             {
                 case WitsmlLog.WITSML_INDEX_TYPE_MD:
-                    queryLog.StartIndex = new WitsmlIndex((DepthIndex)startIndex);
-                    queryLog.EndIndex = new WitsmlIndex((DepthIndex)endIndex);
+                    queryLog.StartIndex = startIndex != null ? new WitsmlIndex((DepthIndex)startIndex) : new WitsmlIndex();
+                    queryLog.EndIndex = endIndex != null ? new WitsmlIndex((DepthIndex)endIndex) : new WitsmlIndex();
                     break;
                 case WitsmlLog.WITSML_INDEX_TYPE_DATE_TIME:
-                    queryLog.StartDateTimeIndex = startIndex.GetValueAsString();
-                    queryLog.EndDateTimeIndex = endIndex.GetValueAsString();
+                    queryLog.StartDateTimeIndex = startIndex?.GetValueAsString() ?? "";
+                    queryLog.EndDateTimeIndex = endIndex?.GetValueAsString() ?? "";
+                    break;
+                default:
                     break;
             }
 
@@ -95,7 +116,7 @@ namespace WitsmlExplorer.Api.Query
             Index startIndex,
             Index endIndex)
         {
-            var queryLog = new WitsmlLog
+            WitsmlLog queryLog = new()
             {
                 Uid = logUid,
                 UidWell = wellUid,
@@ -116,6 +137,8 @@ namespace WitsmlExplorer.Api.Query
                 case WitsmlLog.WITSML_INDEX_TYPE_DATE_TIME:
                     queryLog.StartDateTimeIndex = startIndex.GetValueAsString();
                     queryLog.EndDateTimeIndex = endIndex.GetValueAsString();
+                    break;
+                default:
                     break;
             }
 
@@ -138,7 +161,33 @@ namespace WitsmlExplorer.Api.Query
                     {
                         Mnemonic = mnemonic
                     }).ToList()
-                }.AsSingletonList()
+                }.AsItemInList()
+            };
+        }
+
+        public static WitsmlLogs GetLogHeaderIndexes(string wellUid, string wellboreUid, string logUid)
+        {
+            return new WitsmlLogs
+            {
+                Logs = new WitsmlLog
+                {
+                    UidWell = wellUid,
+                    UidWellbore = wellboreUid,
+                    Uid = logUid,
+                    StartIndex = new WitsmlIndex(),
+                    EndIndex = new WitsmlIndex(),
+                    StartDateTimeIndex = "",
+                    EndDateTimeIndex = "",
+                    IndexCurve = new WitsmlIndexCurve(),
+                    LogCurveInfo = new WitsmlLogCurveInfo
+                    {
+                        Mnemonic = "",
+                        MinIndex = new WitsmlIndex(),
+                        MaxIndex = new WitsmlIndex(),
+                        MinDateTimeIndex = "",
+                        MaxDateTimeIndex = ""
+                    }.AsItemInList(),
+                }.AsItemInList()
             };
         }
     }

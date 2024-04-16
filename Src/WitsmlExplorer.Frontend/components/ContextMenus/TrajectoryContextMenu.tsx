@@ -1,61 +1,106 @@
 import { Typography } from "@equinor/eds-core-react";
-import { MenuItem } from "@material-ui/core";
-import React from "react";
-import { DisplayModalAction, HideContextMenuAction, HideModalAction } from "../../contexts/operationStateReducer";
-import { ObjectType } from "../../models/objectType";
-import { Server } from "../../models/server";
-import Trajectory from "../../models/trajectory";
-import Wellbore from "../../models/wellbore";
-import { JobType } from "../../services/jobService";
-import { colors } from "../../styles/Colors";
-import ContextMenu from "./ContextMenu";
-import { menuItemText, onClickDeleteObjects, onClickShowObjectOnServer, StyledIcon } from "./ContextMenuUtils";
-import { copyObjectOnWellbore, pasteObjectOnWellbore } from "./CopyUtils";
-import NestedMenuItem from "./NestedMenuItem";
-import { useClipboardReferencesOfType } from "./UseClipboardReferences";
+import { Divider, MenuItem } from "@material-ui/core";
+import ContextMenu from "components/ContextMenus/ContextMenu";
+import {
+  StyledIcon,
+  menuItemText
+} from "components/ContextMenus/ContextMenuUtils";
+import { pasteComponents } from "components/ContextMenus/CopyUtils";
+import {
+  ObjectContextMenuProps,
+  ObjectMenuItems
+} from "components/ContextMenus/ObjectMenuItems";
+import { useClipboardComponentReferencesOfType } from "components/ContextMenus/UseClipboardComponentReferences";
+import { PropertiesModalMode } from "components/Modals/ModalParts";
+import TrajectoryPropertiesModal, {
+  TrajectoryPropertiesModalProps
+} from "components/Modals/TrajectoryPropertiesModal";
+import NavigationContext from "contexts/navigationContext";
+import OperationContext from "contexts/operationContext";
+import OperationType from "contexts/operationType";
+import { useOpenInQueryView } from "hooks/useOpenInQueryView";
+import { ComponentType } from "models/componentType";
+import { ObjectType } from "models/objectType";
+import Trajectory from "models/trajectory";
+import React, { useContext } from "react";
+import { colors } from "styles/Colors";
 
-export interface TrajectoryContextMenuProps {
-  dispatchOperation: (action: HideModalAction | HideContextMenuAction | DisplayModalAction) => void;
-  trajectories: Trajectory[];
-  selectedServer: Server;
-  servers: Server[];
-  wellbore: Wellbore;
-}
+const TrajectoryContextMenu = (
+  props: ObjectContextMenuProps
+): React.ReactElement => {
+  const { checkedObjects, wellbore } = props;
+  const { navigationState, dispatchNavigation } = useContext(NavigationContext);
+  const { servers } = navigationState;
+  const { dispatchOperation } = useContext(OperationContext);
+  const trajectoryStationReferences = useClipboardComponentReferencesOfType(
+    ComponentType.TrajectoryStation
+  );
+  const openInQueryView = useOpenInQueryView();
 
-const TrajectoryContextMenu = (props: TrajectoryContextMenuProps): React.ReactElement => {
-  const { dispatchOperation, trajectories, selectedServer, servers, wellbore } = props;
-  const trajectoryReferences = useClipboardReferencesOfType(ObjectType.Trajectory);
+  const onClickModify = async () => {
+    dispatchOperation({ type: OperationType.HideContextMenu });
+    const mode = PropertiesModalMode.Edit;
+    const modifyObjectProps: TrajectoryPropertiesModalProps = {
+      mode,
+      trajectory: checkedObjects[0] as Trajectory,
+      dispatchOperation
+    };
+    dispatchOperation({
+      type: OperationType.DisplayModal,
+      payload: <TrajectoryPropertiesModal {...modifyObjectProps} />
+    });
+  };
+
+  const extraMenuItems = (): React.ReactElement[] => {
+    return [
+      <MenuItem
+        key={"paste"}
+        onClick={() =>
+          pasteComponents(
+            servers,
+            trajectoryStationReferences,
+            dispatchOperation,
+            checkedObjects[0]
+          )
+        }
+        disabled={
+          trajectoryStationReferences === null || checkedObjects.length !== 1
+        }
+      >
+        <StyledIcon name="paste" color={colors.interactive.primaryResting} />
+        <Typography color={"primary"}>
+          {menuItemText(
+            "paste",
+            "trajectory station",
+            trajectoryStationReferences?.componentUids
+          )}
+        </Typography>
+      </MenuItem>,
+      <Divider key={"divider"} />,
+      <MenuItem
+        key={"properties"}
+        onClick={onClickModify}
+        disabled={checkedObjects.length !== 1}
+      >
+        <StyledIcon name="settings" color={colors.interactive.primaryResting} />
+        <Typography color={"primary"}>Properties</Typography>
+      </MenuItem>
+    ];
+  };
 
   return (
     <ContextMenu
       menuItems={[
-        <MenuItem key={"copy"} onClick={() => copyObjectOnWellbore(selectedServer, trajectories, dispatchOperation, ObjectType.Trajectory)} disabled={trajectories.length === 0}>
-          <StyledIcon name="copy" color={colors.interactive.primaryResting} />
-          <Typography color={"primary"}>{menuItemText("copy", "trajectory", trajectories)}</Typography>
-        </MenuItem>,
-        <MenuItem
-          key={"paste"}
-          onClick={() => pasteObjectOnWellbore(servers, trajectoryReferences, dispatchOperation, wellbore, JobType.CopyTrajectory)}
-          disabled={trajectoryReferences === null}
-        >
-          <StyledIcon name="paste" color={colors.interactive.primaryResting} />
-          <Typography color={"primary"}>{menuItemText("paste", "trajectory", trajectoryReferences?.objectUids)}</Typography>
-        </MenuItem>,
-        <MenuItem
-          key={"delete"}
-          onClick={() => onClickDeleteObjects(dispatchOperation, trajectories, ObjectType.Trajectory, JobType.DeleteTrajectories)}
-          disabled={trajectories.length === 0}
-        >
-          <StyledIcon name="deleteToTrash" color={colors.interactive.primaryResting} />
-          <Typography color={"primary"}>{menuItemText("delete", "trajectory", trajectories)}</Typography>
-        </MenuItem>,
-        <NestedMenuItem key={"showOnServer"} label={"Show on server"} disabled={trajectories.length !== 1}>
-          {servers.map((server: Server) => (
-            <MenuItem key={server.name} onClick={() => onClickShowObjectOnServer(dispatchOperation, server, trajectories[0], "trajectoryUid")} disabled={trajectories.length !== 1}>
-              <Typography color={"primary"}>{server.name}</Typography>
-            </MenuItem>
-          ))}
-        </NestedMenuItem>
+        ...ObjectMenuItems(
+          checkedObjects,
+          ObjectType.Trajectory,
+          navigationState,
+          dispatchOperation,
+          dispatchNavigation,
+          openInQueryView,
+          wellbore,
+          extraMenuItems()
+        )
       ]}
     />
   );

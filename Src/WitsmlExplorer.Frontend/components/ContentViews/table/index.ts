@@ -1,3 +1,2 @@
-export * from "./tableParts";
-export * from "./ContentTable";
-export * from "./VirtualizedContentTable";
+export * from "components/ContentViews/table/ContentTable";
+export * from "components/ContentViews/table/tableParts";

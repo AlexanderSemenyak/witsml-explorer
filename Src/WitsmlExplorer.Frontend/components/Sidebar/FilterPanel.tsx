@@ -1,135 +1,277 @@
-﻿import { Checkbox, Divider, FormControlLabel as MuiFormControlLabel, TextField as MuiTextField } from "@material-ui/core";
-import ChevronRightIcon from "@material-ui/icons/ChevronRight";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
-import React, { useContext, useEffect, useState } from "react";
+﻿import {
+  Checkbox,
+  EdsProvider,
+  Icon,
+  TextField,
+  Typography
+} from "@equinor/eds-core-react";
+import { Divider, Tooltip } from "@material-ui/core";
+import { FilterContext, VisibilityStatus } from "contexts/filter";
+import NavigationContext from "contexts/navigationContext";
+import NavigationType from "contexts/navigationType";
+import OperationContext from "contexts/operationContext";
+import { ObjectType } from "models/objectType";
+import React, { ChangeEvent, useContext } from "react";
 import styled from "styled-components";
-import CurveThreshold, { DEFAULT_CURVE_THRESHOLD } from "../../contexts/curveThreshold";
-import Filter, { EMPTY_FILTER } from "../../contexts/filter";
-import NavigationContext from "../../contexts/navigationContext";
-import NavigationType from "../../contexts/navigationType";
-import { colors } from "../../styles/Colors";
+import { Colors } from "styles/Colors";
+import {
+  STORAGE_FILTER_HIDDENOBJECTS_KEY,
+  setLocalStorageItem
+} from "tools/localStorageHelpers";
 
 const FilterPanel = (): React.ReactElement => {
   const { navigationState, dispatchNavigation } = useContext(NavigationContext);
-  const { selectedFilter, selectedCurveThreshold } = navigationState;
+  const { selectedCurveThreshold } = navigationState;
+  const { selectedFilter, updateSelectedFilter } = useContext(FilterContext);
+  const {
+    operationState: { colors }
+  } = useContext(OperationContext);
 
-  const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
-  const [curveThreshold, setCurveThreshold] = useState<CurveThreshold>(DEFAULT_CURVE_THRESHOLD);
-
-  const [expanded, setExpanded] = useState<boolean>(true);
-
-  useEffect(() => {
-    setFilter(selectedFilter);
-  }, [selectedFilter]);
-
-  useEffect(() => {
-    setCurveThreshold(selectedCurveThreshold);
-  }, [selectedCurveThreshold]);
+  const switchObjectVisibility = (objectType: ObjectType) => {
+    const updatedVisibility = { ...selectedFilter.objectVisibilityStatus };
+    if (updatedVisibility[objectType] === VisibilityStatus.Visible) {
+      updatedVisibility[objectType] = VisibilityStatus.Hidden;
+    } else {
+      updatedVisibility[objectType] = VisibilityStatus.Visible;
+    }
+    setLocalStorageItem<ObjectType[]>(
+      STORAGE_FILTER_HIDDENOBJECTS_KEY,
+      Object.entries(updatedVisibility)
+        .filter(([, value]) => value == VisibilityStatus.Hidden)
+        .map(([key]) => key as ObjectType)
+    );
+    updateSelectedFilter({ objectVisibilityStatus: updatedVisibility });
+  };
 
   return (
-    <Container expanded={expanded}>
-      <FilterPanelHeader onClick={() => setExpanded(!expanded)}>
-        <div>{expanded ? <ExpandMoreIcon color={"disabled"} style={{ width: 18 }} /> : <ChevronRightIcon color={"disabled"} style={{ width: 18 }} />}</div>
-        <div>Filter options</div>
-      </FilterPanelHeader>
-      {expanded && (
-        <>
-          <TextField
-            id="filter-tree"
-            label="Filter on well name"
-            onChange={(event) => dispatchNavigation({ type: NavigationType.SetFilter, payload: { filter: { ...filter, wellName: event.target.value } } })}
-            value={filter.wellName}
-            autoComplete={"off"}
-          />
-          <TextField
+    <EdsProvider density="compact">
+      <Container colors={colors}>
+        <NumberInputContainer colors={colors}>
+          <span style={{ display: "flex", gap: "7px" }}>
+            <Typography
+              token={{
+                fontFamily: "EquinorMedium",
+                fontSize: "0.75rem",
+                color: colors.interactive.primaryResting
+              }}
+            >
+              Limit number of wells
+            </Typography>
+            <Typography
+              token={{
+                fontStyle: "italic",
+                fontFamily: "EquinorRegular",
+                fontSize: "0.75rem",
+                color: colors.text.staticIconsTertiary
+              }}
+            >
+              (0 for no limit)
+            </Typography>
+          </span>
+          <StyledTextField
             id="filter-wellLimit"
-            label="Limit number of wells (0 for no limit)"
             type="number"
-            InputProps={{ inputProps: { min: 0 } }}
-            onChange={(event) => dispatchNavigation({ type: NavigationType.SetFilter, payload: { filter: { ...filter, wellLimit: Number(event.target.value) } } })}
-            value={filter.wellLimit}
+            min={0}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              updateSelectedFilter({ wellLimit: Number(event.target.value) })
+            }
+            value={selectedFilter.wellLimit}
             autoComplete={"off"}
+            colors={colors}
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                id="filter-isActive"
-                onChange={(event) => dispatchNavigation({ type: NavigationType.SetFilter, payload: { filter: { ...filter, isActive: event.target.checked } } })}
-                value={filter.isActive}
-              />
-            }
-            label={"Show only active wells and wellbores"}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                id="filter-objectGrowing"
-                onChange={(event) => dispatchNavigation({ type: NavigationType.SetFilter, payload: { filter: { ...filter, objectGrowing: event.target.checked } } })}
-                value={filter.objectGrowing}
-              />
-            }
-            label={"Show only growing logs"}
-          />
-          <Divider />
-          <TextField
-            id="curveThreshold-time"
-            label="Set threshold for time curve (in minutes)"
-            type="number"
-            InputProps={{ inputProps: { min: 0 } }}
+        </NumberInputContainer>
+
+        <Divider />
+
+        <InnerContainer>
+          <StyledCheckbox
+            id="filter-isActive"
+            value={"Hide inactive Wells / Wellbores"}
+            color={"primary"}
+            checked={selectedFilter.isActive}
             onChange={(event) =>
-              dispatchNavigation({ type: NavigationType.SetCurveThreshold, payload: { curveThreshold: { ...curveThreshold, timeInMinutes: Number(event.target.value) } } })
+              updateSelectedFilter({ isActive: event.target.checked })
             }
-            value={curveThreshold.timeInMinutes}
-            autoComplete={"off"}
+            label={"Hide inactive Wells / Wellbores"}
+            colors={colors}
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                id="curveThreshold-hideInactive"
-                onChange={(event) =>
-                  dispatchNavigation({ type: NavigationType.SetCurveThreshold, payload: { curveThreshold: { ...curveThreshold, hideInactiveCurves: event.target.checked } } })
+          <StyledCheckbox
+            onChange={(event) =>
+              updateSelectedFilter({ objectGrowing: event.target.checked })
+            }
+            checked={selectedFilter.objectGrowing}
+            id="filter-objectGrowing"
+            value={"Only show growing logs"}
+            color={"primary"}
+            label={"Only show growing logs"}
+            colors={colors}
+          />
+        </InnerContainer>
+
+        <Divider />
+
+        <InnerContainer>
+          <NumberInputContainer colors={colors}>
+            <span style={{ display: "flex", gap: "7px" }}>
+              <Typography
+                token={{
+                  fontFamily: "EquinorMedium",
+                  fontSize: "0.75rem",
+                  color: colors.interactive.primaryResting
+                }}
+              >
+                Set threshold for time curve
+              </Typography>
+              <Typography
+                token={{
+                  fontStyle: "italic",
+                  fontFamily: "EquinorRegular",
+                  fontSize: "0.75rem",
+                  color: colors.text.staticIconsTertiary
+                }}
+              >
+                {" "}
+                (minutes){" "}
+              </Typography>
+            </span>
+            <StyledTextField
+              id="curveThreshold-time"
+              type="number"
+              min={0}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                dispatchNavigation({
+                  type: NavigationType.SetCurveThreshold,
+                  payload: {
+                    curveThreshold: {
+                      ...selectedCurveThreshold,
+                      timeInMinutes: Number(event.target.value)
+                    }
+                  }
+                })
+              }
+              value={selectedCurveThreshold.timeInMinutes}
+              autoComplete={"off"}
+              colors={colors}
+            />
+          </NumberInputContainer>
+          <StyledCheckbox
+            id="curveThreshold-hideInactive"
+            onChange={(event) =>
+              dispatchNavigation({
+                type: NavigationType.SetCurveThreshold,
+                payload: {
+                  curveThreshold: {
+                    ...selectedCurveThreshold,
+                    hideInactiveCurves: event.target.checked
+                  }
                 }
-                value={curveThreshold}
-              />
+              })
             }
+            checked={selectedCurveThreshold.hideInactiveCurves}
+            value={"Hide inactive time curves"}
+            color={"primary"}
             label={"Hide inactive time curves"}
+            colors={colors}
           />
-        </>
-      )}
-    </Container>
+        </InnerContainer>
+
+        <Divider />
+
+        <InnerContainer>
+          <ObjectTitleContainer>
+            <Typography
+              token={{
+                fontSize: "1rem",
+                fontFamily: "EquinorMedium",
+                color: colors.interactive.primaryResting
+              }}
+            >
+              Well Objects
+            </Typography>
+            <Tooltip title="Objects not supported by the current server are disabled.">
+              <Icon
+                name="infoCircle"
+                color={colors.interactive.primaryResting}
+                size={18}
+              />
+            </Tooltip>
+          </ObjectTitleContainer>
+          <ObjectListContainer>
+            {Object.values(ObjectType).map((objectType) => (
+              <StyledCheckbox
+                label={objectType}
+                checked={
+                  selectedFilter.objectVisibilityStatus[objectType] ==
+                  VisibilityStatus.Visible
+                }
+                disabled={
+                  selectedFilter.objectVisibilityStatus[objectType] ==
+                  VisibilityStatus.Disabled
+                }
+                key={objectType}
+                colors={colors}
+                onChange={() => switchObjectVisibility(objectType)}
+              />
+            ))}
+          </ObjectListContainer>
+        </InnerContainer>
+      </Container>
+    </EdsProvider>
   );
 };
 
-const Container = styled.div<{ expanded: boolean }>`
-  background-color: ${colors.ui.backgroundLight};
+const Container = styled.div<{ colors: Colors }>`
   display: flex;
   flex-direction: column;
-  padding: 0.4rem;
-  align-items: stretch;
+  gap: 0.5em;
+  padding: 0.5em;
+  user-select: none;
+  box-shadow: 1px 4px 5px 0px rgba(0, 0, 0, 0.3);
+  background: ${(props) => props.colors.ui.backgroundLight};
 `;
 
-const FilterPanelHeader = styled.div`
+const InnerContainer = styled.div`
   display: flex;
-  flex-direction: row;
-  line-height: 1.5rem;
-  font-family: EquinorMedium, sans-serif;
+  flex-direction: column;
 `;
 
-const TextField = styled(MuiTextField)`
-  && {
-    margin-left: 0.5rem;
-    :hover {
-      background-color: ${colors.ui.backgroundDefault};
-    }
+const NumberInputContainer = styled.div<{ colors: Colors }>`
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  align-items: baseline;
+  padding-left: 0.5em;
+  color: ${(props) => props.colors.interactive.primaryResting};
+`;
+
+const ObjectListContainer = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  overflow-y: scroll;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+`;
+
+const ObjectTitleContainer = styled.div`
+  padding-left: 0.8rem;
+  display: flex;
+  gap: 8px;
+`;
+
+const StyledCheckbox = styled(Checkbox)<{ colors: Colors }>`
+  span {
+    color: ${(props) => props.colors.infographic.primaryMossGreen};
+  }
+  span:hover {
+    background: ${(props) => props.colors.interactive.checkBoxHover};
   }
 `;
 
-const FormControlLabel = styled(MuiFormControlLabel)`
-  && {
-    margin-left 0.4rem;
-    :hover {
-      background-color: ${colors.ui.backgroundDefault};
-    }
+const StyledTextField = styled(TextField)<{ colors: Colors }>`
+  label {
+    color: ${(props) => props.colors.text.staticTextLabel};
+  }
+  div {
+    background: ${(props) => props.colors.text.staticTextFieldDefault};
   }
 `;
 

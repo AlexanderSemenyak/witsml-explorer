@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 
 using Witsml.Data;
+using Witsml.Data.Measures;
 using Witsml.Extensions;
 
 using WitsmlExplorer.Api.Models;
@@ -32,8 +33,9 @@ namespace WitsmlExplorer.Api.Query
                     Field = well.Field.NullIfEmpty(),
                     Country = well.Country.NullIfEmpty(),
                     Operator = well.Operator.NullIfEmpty(),
+                    NumLicense = well.NumLicense.NullIfEmpty(),
                     TimeZone = well.TimeZone
-                }.AsSingletonList()
+                }.AsItemInList()
             };
         }
 
@@ -45,7 +47,7 @@ namespace WitsmlExplorer.Api.Query
                 {
                     Uid = wellUid,
                     Name = name
-                }.AsSingletonList()
+                }.AsItemInList()
             };
         }
 
@@ -60,14 +62,15 @@ namespace WitsmlExplorer.Api.Query
                     Field = well.Field,
                     TimeZone = well.TimeZone,
                     Country = well.Country,
-                    Operator = well.Operator
-                }.AsSingletonList()
+                    Operator = well.Operator,
+                    NumLicense = well.NumLicense
+                }.AsItemInList()
             };
         }
 
         public static WitsmlWells DeleteWitsmlWell(string wellUid)
         {
-            return new WitsmlWells { Wells = new WitsmlWell { Uid = wellUid }.AsSingletonList() };
+            return new WitsmlWells { Wells = new WitsmlWell { Uid = wellUid }.AsItemInList() };
         }
 
         private static WitsmlWells GetWitsmlWell(string wellUid = "")
@@ -81,19 +84,20 @@ namespace WitsmlExplorer.Api.Query
                     Field = "",
                     Country = "",
                     Operator = "",
+                    NumLicense = "",
                     TimeZone = "",
                     StatusWell = "",
                     PurposeWell = "",
                     WellDatum = new List<WellDatum>(),
-                    WaterDepth = "",
-                    WellLocation = new WitsmlLocation(),
+                    WaterDepth = Measure.ToFetch<WitsmlLengthMeasure>(),
+                    WellLocation = new List<WitsmlLocation>(),
                     CommonData = new WitsmlCommonData
                     {
                         DTimCreation = "",
                         DTimLastChange = "",
                         ItemState = ""
                     }
-                }.AsSingletonList()
+                }.AsItemInList()
             };
         }
     }

@@ -31,7 +31,6 @@ namespace WitsmlExplorer.Api.Services
         private readonly ICredentialsService _credentialsService;
         private readonly ILogger<WitsmlClientProvider> _logger;
         private readonly bool _logQueries;
-        private readonly bool _useOAuth;
 
         public WitsmlClientProvider(ILogger<WitsmlClientProvider> logger, IConfiguration configuration, IHttpContextAccessor httpContextAccessor, ICredentialsService credentialsService, IOptions<WitsmlClientCapabilities> witsmlClientCapabilities)
         {
@@ -45,13 +44,18 @@ namespace WitsmlExplorer.Api.Services
             _logger = logger ?? throw new ArgumentException("Logger missing");
             _logQueries = StringHelpers.ToBoolean(configuration[ConfigConstants.LogQueries]);
             _logger.LogDebug("WitsmlClientProvider initialised");
-            _useOAuth = StringHelpers.ToBoolean(configuration[ConfigConstants.OAuth2Enabled]);
         }
 
         internal WitsmlClientProvider(IConfiguration configuration)
         {
             (string serverUrl, string username, string password) = GetCredentialsFromConfiguration(configuration);
-            _witsmlClient = new WitsmlClient(serverUrl, username, password, new WitsmlClientCapabilities(), null, true);
+            _witsmlClient = new WitsmlClient(
+                options =>
+                {
+                    options.Hostname = serverUrl;
+                    options.Credentials = new WitsmlCredentials(username, password);
+                    options.LogQueries = true;
+                });
         }
 
         private static (string, string, string) GetCredentialsFromConfiguration(IConfiguration configuration)
@@ -67,12 +71,18 @@ namespace WitsmlExplorer.Api.Services
         {
             if (_witsmlClient == null)
             {
-                _targetCreds = _credentialsService.GetCredentials(_useOAuth, _httpHeaders, _httpHeaders.TargetServer, _httpHeaders.TargetUsername);
-                _witsmlClient = (_targetCreds != null && !_targetCreds.IsCredsNullOrEmpty())
-                    ? new WitsmlClient(_targetCreds.Host.ToString(), _targetCreds.UserId, _targetCreds.Password, _clientCapabilities, null, _logQueries)
+                _targetCreds = _credentialsService.GetCredentials(_httpHeaders, _httpHeaders.TargetServer, _httpHeaders.TargetUsername);
+                _witsmlClient = (_targetCreds != null && !_targetCreds.IsNullOrEmpty())
+                    ? new WitsmlClient(options =>
+                    {
+                        options.Hostname = _httpHeaders.TargetServer;
+                        options.Credentials = new WitsmlCredentials(_targetCreds.UserId, _targetCreds.Password);
+                        options.ClientCapabilities = _clientCapabilities;
+                        options.LogQueries = _logQueries;
+                        options.RequestTimeOut = TimeSpan.FromSeconds(CommonConstants.DefaultClientRequestTimeOutSeconds);
+                    })
                     : null;
             }
-            _logger.LogInformation("Current target host: {Host}", _witsmlClient?.GetServerHostname().Host);
             return _witsmlClient;
         }
 
@@ -80,12 +90,18 @@ namespace WitsmlExplorer.Api.Services
         {
             if (_witsmlSourceClient == null)
             {
-                _sourceCreds = _credentialsService.GetCredentials(_useOAuth, _httpHeaders, _httpHeaders.SourceServer, _httpHeaders.SourceUsername);
-                _witsmlSourceClient = (_sourceCreds != null && !_sourceCreds.IsCredsNullOrEmpty())
-                    ? new WitsmlClient(_sourceCreds.Host.ToString(), _sourceCreds.UserId, _sourceCreds.Password, _clientCapabilities, null, _logQueries)
+                _sourceCreds = _credentialsService.GetCredentials(_httpHeaders, _httpHeaders.SourceServer, _httpHeaders.SourceUsername);
+                _witsmlSourceClient = (_sourceCreds != null && !_sourceCreds.IsNullOrEmpty())
+                    ? new WitsmlClient(options =>
+                    {
+                        options.Hostname = _httpHeaders.SourceServer;
+                        options.Credentials = new WitsmlCredentials(_sourceCreds.UserId, _sourceCreds.Password);
+                        options.ClientCapabilities = _clientCapabilities;
+                        options.LogQueries = _logQueries;
+                        options.RequestTimeOut = TimeSpan.FromSeconds(CommonConstants.DefaultClientRequestTimeOutSeconds);
+                    })
                     : null;
             }
-            _logger.LogInformation("Current source host: {Host}", _witsmlSourceClient?.GetServerHostname().Host);
             return _witsmlSourceClient;
         }
     }

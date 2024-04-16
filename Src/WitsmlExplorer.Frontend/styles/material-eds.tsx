@@ -1,6 +1,6 @@
 import { createTheme, Theme } from "@material-ui/core";
-import { UserTheme } from "../contexts/operationStateReducer";
-import { colors } from "./Colors";
+import { UserTheme } from "contexts/operationStateReducer";
+import { colors } from "styles/Colors";
 
 const EquinorRegular = {
   fontFamily: "EquinorRegular"
@@ -161,7 +161,7 @@ const getTheme = (theme: UserTheme): Theme => {
         MuiTableCell: {
           root: {
             lineHeight: "1.25rem",
-            padding: "0.5rem 0 0.25rem 1rem"
+            padding: "0.25rem"
           }
         }
       }

@@ -7,13 +7,13 @@ using Witsml.Extensions;
 
 namespace Witsml.Data.Rig
 {
-    public class WitsmlRig : ObjectOnWellbore<WitsmlRigs>
+    public class WitsmlRig : WitsmlObjectOnWellbore
     {
-        public override WitsmlRigs AsSingletonWitsmlList()
+        public override WitsmlRigs AsItemInWitsmlList()
         {
             return new WitsmlRigs()
             {
-                Rigs = this.AsSingletonList()
+                Rigs = this.AsItemInList()
             };
         }
 

@@ -1,31 +1,51 @@
 import { TextField, Typography } from "@equinor/eds-core-react";
+import SortableEdsTable, {
+  Column
+} from "components/ContentViews/table/SortableEdsTable";
+import formatDateString from "components/DateFormatter";
+import {
+  ComparisonCell,
+  LabelsLayout,
+  StyledTypography,
+  TableLayout
+} from "components/Modals/ComparisonModalStyles";
+import { markDateTimeStringDifferences } from "components/Modals/LogComparisonUtils";
+import { displayMissingObjectModal } from "components/Modals/MissingObjectModals";
+import ModalDialog, {
+  ModalContentLayout,
+  ModalWidth
+} from "components/Modals/ModalDialog";
+import ProgressSpinner from "components/ProgressSpinner";
+import OperationContext from "contexts/operationContext";
+import { DispatchOperation } from "contexts/operationStateReducer";
+import OperationType from "contexts/operationType";
+import MessageObject from "models/messageObject";
+import ObjectOnWellbore from "models/objectOnWellbore";
+import { ObjectType } from "models/objectType";
+import { Server } from "models/server";
 import { useContext, useEffect, useState } from "react";
-import styled from "styled-components";
-import OperationContext from "../../contexts/operationContext";
-import OperationType from "../../contexts/operationType";
-import MessageObject from "../../models/messageObject";
-import { ObjectType } from "../../models/objectType";
-import { Server } from "../../models/server";
-import MessageObjectService from "../../services/messageObjectService";
-import SortableEdsTable, { Column } from "../ContentViews/table/SortableEdsTable";
-import { DispatchOperation } from "../ContextMenus/ContextMenuUtils";
-import formatDateString from "../DateFormatter";
-import { displayMissingObjectModal } from "../Modals/MissingObjectModals";
-import ProgressSpinner from "../ProgressSpinner";
-import { markDateTimeStringDifferences } from "./LogComparisonUtils";
-import ModalDialog, { ModalContentLayout, ModalWidth } from "./ModalDialog";
+import ObjectService from "services/objectService";
 
 export interface MessageComparisonModalProps {
   sourceMessage: MessageObject;
   sourceServer: Server;
   targetServer: Server;
+  targetObject: ObjectOnWellbore;
   dispatchOperation: DispatchOperation;
 }
 
-const MessageComparisonModal = (props: MessageComparisonModalProps): React.ReactElement => {
-  const { sourceMessage, sourceServer, targetServer, dispatchOperation } = props;
+const MessageComparisonModal = (
+  props: MessageComparisonModalProps
+): React.ReactElement => {
   const {
-    operationState: { timeZone }
+    sourceMessage,
+    sourceServer,
+    targetServer,
+    targetObject,
+    dispatchOperation
+  } = props;
+  const {
+    operationState: { timeZone, colors, dateTimeFormat }
   } = useContext(OperationContext);
   const [targetMessage, setTargetMessage] = useState<MessageObject>(null);
   const [differenceFound, setDifferenceFound] = useState(false);
@@ -33,13 +53,25 @@ const MessageComparisonModal = (props: MessageComparisonModalProps): React.React
 
   useEffect(() => {
     const fetchTarget = async () => {
-      const wellUid = sourceMessage.wellUid;
-      const wellboreUid = sourceMessage.wellboreUid;
-      const target = await MessageObjectService.getMessageFromServer(wellUid, wellboreUid, sourceMessage.uid, targetServer);
+      const target = await ObjectService.getObjectFromServer(
+        targetObject.wellUid,
+        targetObject.wellboreUid,
+        targetObject.uid,
+        ObjectType.Message,
+        targetServer
+      );
       if (target == null) {
         dispatchOperation({ type: OperationType.HideModal });
-        const failureMessageTarget = `Unable to compare the message as either the message with UID ${sourceMessage.uid} does not exist on the target server or it was not possible to fetch the message.`;
-        displayMissingObjectModal(targetServer, wellUid, wellboreUid, sourceMessage.uid, dispatchOperation, failureMessageTarget, ObjectType.Message);
+        const failureMessageTarget = `Unable to compare the message as either the message with UID ${targetObject.uid} does not exist on the target server or it was not possible to fetch the message.`;
+        displayMissingObjectModal(
+          targetServer,
+          targetObject.wellUid,
+          targetObject.wellboreUid,
+          targetObject.uid,
+          dispatchOperation,
+          failureMessageTarget,
+          ObjectType.Message
+        );
       } else {
         setTargetMessage(target);
       }
@@ -52,28 +84,41 @@ const MessageComparisonModal = (props: MessageComparisonModalProps): React.React
       return;
     }
     const rows = [];
-    const sourceDTim = formatDateString(sourceMessage.dTim, timeZone);
-    const targetDTim = formatDateString(targetMessage.dTim, timeZone);
+    const sourceDTim = formatDateString(
+      sourceMessage.dTim,
+      timeZone,
+      dateTimeFormat
+    );
+    const targetDTim = formatDateString(
+      targetMessage.dTim,
+      timeZone,
+      dateTimeFormat
+    );
     let areDifferent = sourceDTim != targetDTim;
-    const [sourceDTimDiff, targetDTimDiff] = markDateTimeStringDifferences(sourceDTim, targetDTim);
+    const [sourceDTimDiff, targetDTimDiff] = markDateTimeStringDifferences(
+      sourceDTim,
+      targetDTim
+    );
     rows.push({
       element: "dTim",
       source: sourceDTimDiff,
       target: targetDTimDiff,
       elementValue: (
-        <TableCell>
-          <Typography>{sourceDTim != targetDTim ? <mark>dTim</mark> : "dTim"}</Typography>
-        </TableCell>
+        <ComparisonCell>
+          <Typography>
+            {sourceDTim != targetDTim ? <mark>dTim</mark> : "dTim"}
+          </Typography>
+        </ComparisonCell>
       ),
       sourceValue: (
-        <TableCell>
+        <ComparisonCell>
           <Typography>{sourceDTimDiff}</Typography>
-        </TableCell>
+        </ComparisonCell>
       ),
       targetValue: (
-        <TableCell>
+        <ComparisonCell>
           <Typography>{targetDTimDiff}</Typography>
-        </TableCell>
+        </ComparisonCell>
       )
     });
     const pushRow = (element: string, source: string, target: string) => {
@@ -84,18 +129,30 @@ const MessageComparisonModal = (props: MessageComparisonModalProps): React.React
         source,
         target,
         elementValue: (
-          <TableCell>
+          <ComparisonCell>
             <Typography>{diff ? <mark>{element}</mark> : element}</Typography>
-          </TableCell>
+          </ComparisonCell>
         ),
         sourceValue: <Typography>{source}</Typography>,
         targetValue: <Typography>{target}</Typography>
       });
     };
-    pushRow("messageText", sourceMessage.messageText, targetMessage.messageText);
+    pushRow(
+      "messageText",
+      sourceMessage.messageText,
+      targetMessage.messageText
+    );
     pushRow("name", sourceMessage.name, targetMessage.name);
-    pushRow("typeMessage", sourceMessage.typeMessage, targetMessage.typeMessage);
-    pushRow("commonData.sourceName", sourceMessage.commonData.sourceName, targetMessage.commonData.sourceName);
+    pushRow(
+      "typeMessage",
+      sourceMessage.typeMessage,
+      targetMessage.typeMessage
+    );
+    pushRow(
+      "commonData.sourceName",
+      sourceMessage.commonData.sourceName,
+      targetMessage.commonData.sourceName
+    );
     setData(rows);
     setDifferenceFound(areDifferent);
   }, [targetMessage]);
@@ -114,19 +171,64 @@ const MessageComparisonModal = (props: MessageComparisonModalProps): React.React
           {(data && (
             <>
               <LabelsLayout>
-                <TextField readOnly id="wellName" label="Well Name" defaultValue={sourceMessage.wellName} />
-                <TextField readOnly id="sourceServer" label="Source Server" defaultValue={sourceServer.name} />
-                <TextField readOnly id="wellboreName" label="Wellbore Name" defaultValue={sourceMessage.wellboreName} />
-                <TextField readOnly id="targetServer" label="Target Server" defaultValue={targetServer.name} />
-                <TextField readOnly id="uid" label="Message UID" defaultValue={sourceMessage.uid} />
+                <TextField
+                  readOnly
+                  id="sourceServer"
+                  label="Source Server"
+                  defaultValue={sourceServer.name}
+                />
+                <TextField
+                  readOnly
+                  id="targetServer"
+                  label="Target Server"
+                  defaultValue={targetServer.name}
+                />
+                <TextField
+                  readOnly
+                  id="sourceWellName"
+                  label="Source Well Name"
+                  defaultValue={sourceMessage.wellName}
+                />
+                <TextField
+                  readOnly
+                  id="targetWellName"
+                  label="Target Well Name"
+                  defaultValue={targetObject.wellName}
+                />
+                <TextField
+                  readOnly
+                  id="sourceWellboreName"
+                  label="Source Wellbore Name"
+                  defaultValue={sourceMessage.wellboreName}
+                />
+                <TextField
+                  readOnly
+                  id="targetWellboreName"
+                  label="Target Wellbore Name"
+                  defaultValue={targetObject.wellboreName}
+                />
+                <TextField
+                  readOnly
+                  id="uid"
+                  label="Source Message UID"
+                  defaultValue={sourceMessage.uid}
+                />
+                <TextField
+                  readOnly
+                  id="uid"
+                  label="Target Message UID"
+                  defaultValue={targetObject.uid}
+                />
               </LabelsLayout>
               <TableLayout>
                 <SortableEdsTable
                   columns={columns}
                   data={data}
                   caption={
-                    <StyledTypography variant="h5">
-                      {differenceFound ? "Listing of message properties with differing elements marked." : "All the shown fields are equal."}
+                    <StyledTypography colors={colors} variant="h5">
+                      {differenceFound
+                        ? "Listing of message properties with differing elements marked."
+                        : "All the shown fields are equal."}
                     </StyledTypography>
                   }
                 />
@@ -145,27 +247,4 @@ const columns: Column[] = [
   { name: "Target message", accessor: "target" }
 ];
 
-const LabelsLayout = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 0.8rem;
-`;
-
-const TableCell = styled.div`
-  font-feature-settings: "tnum";
-  mark {
-    background: #e6faec;
-    background-blend-mode: darken;
-    font-weight: 600;
-  }
-`;
-
-const TableLayout = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const StyledTypography = styled(Typography)`
-  padding: 1rem 0 1rem 0;
-`;
 export default MessageComparisonModal;

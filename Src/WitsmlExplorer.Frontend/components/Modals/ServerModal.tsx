@@ -1,22 +1,37 @@
-import { Autocomplete } from "@equinor/eds-core-react";
-import { Button, TextField } from "@material-ui/core";
-import MuiThumbUpOutlinedIcon from "@material-ui/icons/ThumbUpOutlined";
+import {
+  Button,
+  Icon,
+  Label,
+  TextField,
+  Tooltip
+} from "@equinor/eds-core-react";
+import { CSSProperties } from "@material-ui/core/styles/withStyles";
+import ModalDialog, {
+  ControlButtonPosition,
+  ModalWidth
+} from "components/Modals/ModalDialog";
+import UserCredentialsModal, {
+  UserCredentialsModalProps
+} from "components/Modals/UserCredentialsModal";
+import { RemoveWitsmlServerAction } from "contexts/modificationActions";
+import ModificationType from "contexts/modificationType";
+import { SelectServerAction } from "contexts/navigationActions";
+import NavigationContext from "contexts/navigationContext";
+import NavigationType from "contexts/navigationType";
+import OperationContext from "contexts/operationContext";
+import {
+  DisplayModalAction,
+  HideModalAction
+} from "contexts/operationStateReducer";
+import OperationType from "contexts/operationType";
+import { Server } from "models/server";
+import { msalEnabled } from "msal/MsalAuthProvider";
 import React, { ChangeEvent, useContext, useState } from "react";
+import NotificationService from "services/notificationService";
+import ServerService from "services/serverService";
 import styled from "styled-components";
-import { RemoveWitsmlServerAction } from "../../contexts/modificationActions";
-import ModificationType from "../../contexts/modificationType";
-import { SelectServerAction } from "../../contexts/navigationActions";
-import NavigationContext from "../../contexts/navigationContext";
-import NavigationType from "../../contexts/navigationType";
-import OperationContext from "../../contexts/operationContext";
-import { DisplayModalAction, HideModalAction } from "../../contexts/operationStateReducer";
-import OperationType from "../../contexts/operationType";
-import { Server } from "../../models/server";
-import NotificationService from "../../services/notificationService";
-import ServerService from "../../services/serverService";
-import { colors } from "../../styles/Colors";
-import ModalDialog from "./ModalDialog";
-import UserCredentialsModal, { UserCredentialsModalProps } from "./UserCredentialsModal";
+import { Colors } from "styles/Colors";
+import Icons from "styles/Icons";
 
 export interface ServerModalProps {
   server: Server;
@@ -28,27 +43,45 @@ const ServerModal = (props: ServerModalProps): React.ReactElement => {
     navigationState: { selectedServer },
     dispatchNavigation
   } = useContext(NavigationContext);
-  const { dispatchOperation } = useContext(OperationContext);
+  const { operationState, dispatchOperation } = useContext(OperationContext);
+  const { colors } = operationState;
   const [server, setServer] = useState<Server>(props.server);
   const [connectionVerified, setConnectionVerified] = useState<boolean>(false);
   const [displayUrlError, setDisplayUrlError] = useState<boolean>(false);
-  const [displayNameError, setDisplayServerNameError] = useState<boolean>(false);
+  const [displayNameError, setDisplayServerNameError] =
+    useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const isAddingNewServer = props.server.id === undefined;
-  const schemeValues = ["Basic", "OAuth2"];
-
+  const labelStyle: CSSProperties = {
+    fontSize: "1rem",
+    fontWeight: 500,
+    color: colors.text.staticIconsDefault,
+    paddingLeft: "0.9rem"
+  };
   const onSubmit = async () => {
     const abortController = new AbortController();
 
     setIsLoading(true);
     try {
       if (isAddingNewServer) {
-        const freshServer = await ServerService.addServer(server, abortController.signal);
-        dispatchNavigation({ type: ModificationType.AddServer, payload: { server: freshServer } });
+        const freshServer = await ServerService.addServer(
+          server,
+          abortController.signal
+        );
+        dispatchNavigation({
+          type: ModificationType.AddServer,
+          payload: { server: freshServer }
+        });
       } else {
-        const freshServer = await ServerService.updateServer(server, abortController.signal);
-        dispatchNavigation({ type: ModificationType.UpdateServer, payload: { server: freshServer } });
+        const freshServer = await ServerService.updateServer(
+          server,
+          abortController.signal
+        );
+        dispatchNavigation({
+          type: ModificationType.UpdateServer,
+          payload: { server: freshServer }
+        });
       }
     } catch (error) {
       NotificationService.Instance.alertDispatcher.dispatch({
@@ -73,12 +106,20 @@ const ServerModal = (props: ServerModalProps): React.ReactElement => {
       confirmText: "Test",
       onConnectionVerified: onVerifyConnection
     };
-    dispatchOperation({ type: OperationType.DisplayModal, payload: <UserCredentialsModal {...userCredentialsModalProps} /> });
+    dispatchOperation({
+      type: OperationType.DisplayModal,
+      payload: <UserCredentialsModal {...userCredentialsModalProps} />
+    });
   };
 
   const showDeleteModal = () => {
     dispatchOperation({ type: OperationType.HideModal });
-    showDeleteServerModal(server, dispatchOperation, dispatchNavigation, selectedServer);
+    showDeleteServerModal(
+      server,
+      dispatchOperation,
+      dispatchNavigation,
+      selectedServer
+    );
   };
 
   const runServerNameValidation = () => {
@@ -90,7 +131,11 @@ const ServerModal = (props: ServerModalProps): React.ReactElement => {
   };
 
   const validateForm = () => {
-    return server.name.length !== 0 && isUrlValid(server.url);
+    return (
+      server.name.length !== 0 &&
+      isUrlValid(server.url) &&
+      !isNaN(server.depthLogDecimals)
+    );
   };
 
   const onChangeUrl = (e: ChangeEvent<HTMLInputElement>) => {
@@ -113,73 +158,132 @@ const ServerModal = (props: ServerModalProps): React.ReactElement => {
       heading={`${isAddingNewServer ? "Add" : "Edit"} server`}
       content={
         <>
-          <ServerAndButton>
+          <ContentWrapper>
+            <Label label="Server URL" style={labelStyle} />
             <TextField
               id="url"
-              label="Server URL"
               defaultValue={server.url}
-              error={displayUrlError}
+              variant={displayUrlError ? "error" : null}
               helperText={displayUrlError ? "Not a valid server url" : ""}
-              fullWidth
-              inputProps={{ maxLength: 256 }}
               onChange={onChangeUrl}
               onBlur={runUrlValidation}
               required
               disabled={props.editDisabled}
             />
-            {connectionVerified && <ThumbUpOutlinedIcon style={{ color: colors.interactive.successResting }} variant={"outlined"} fontSize={"large"} />}
-            <TestServerButton disabled={displayUrlError || connectionVerified} onClick={showCredentialsModal} color={"primary"} variant="outlined">
-              {"Test connection"}
-            </TestServerButton>
-          </ServerAndButton>
-          <TextField
-            id="name"
-            label="Server name"
-            defaultValue={server.name}
-            error={displayNameError}
-            helperText={displayNameError ? "A server name must have 1-64 characters" : ""}
-            fullWidth
-            inputProps={{ minLength: 1, maxLength: 64 }}
-            onBlur={runServerNameValidation}
-            onChange={onChangeName}
-            required
-            disabled={props.editDisabled}
-          />
-          <TextField
-            id="description"
-            label="Server description"
-            defaultValue={server.description}
-            fullWidth
-            inputProps={{ maxLength: 64 }}
-            onChange={(e) => setServer({ ...server, description: e.target.value })}
-            disabled={props.editDisabled}
-          />
-          <Autocomplete
-            id="securityScheme"
-            label="Security Scheme Type"
-            options={schemeValues}
-            initialSelectedOptions={[server.securityscheme || schemeValues[0]]}
-            onOptionsChange={({ selectedItems }) => {
-              setServer({ ...server, securityscheme: selectedItems[0] || schemeValues[0] });
-            }}
-            hideClearButton={true}
-            disabled={props.editDisabled}
-          />
-          <TextField
-            id="role"
-            label="Roles (space delimited)"
-            defaultValue={server.roles?.join(" ")}
-            fullWidth
-            inputProps={{ maxLength: 64 }}
-            onChange={(e) => setServer({ ...server, roles: e.target.value.split(" ") })}
-            disabled={props.editDisabled}
-          />
+            <Label label="Server name" style={labelStyle} />
+            <TextField
+              id="name"
+              defaultValue={server.name}
+              variant={displayNameError ? "error" : null}
+              helperText={
+                displayNameError
+                  ? "A server name must have 1-64 characters"
+                  : ""
+              }
+              onBlur={runServerNameValidation}
+              onChange={onChangeName}
+              required
+              disabled={props.editDisabled}
+            />
+            <Label label="Server description" style={labelStyle} />
+            <TextField
+              id="description"
+              defaultValue={server.description}
+              onChange={(e: any) =>
+                setServer({ ...server, description: e.target.value })
+              }
+              disabled={props.editDisabled}
+            />
+            {msalEnabled && (
+              <>
+                <Label label="Roles (space delimited)" style={labelStyle} />
+                <TextField
+                  id="role"
+                  defaultValue={server.roles?.join(" ")}
+                  onChange={(e: any) =>
+                    setServer({
+                      ...server,
+                      roles: e.target.value
+                        .split(" ")
+                        .filter((role: string) => role.trim() !== "")
+                    })
+                  }
+                  disabled={props.editDisabled}
+                />
+                <div style={{ display: "flex", flexDirection: "row" }}>
+                  <Label label="Credential Ids" style={labelStyle} />
+                  <Tooltip title="If this (space delimited) field is set, the server will use the credentials with the given ids to authenticate. Otherwise, the server will use the Server URL to find the credentials.">
+                    <Icon
+                      name="infoCircle"
+                      color={colors.interactive.primaryResting}
+                      size={18}
+                    />
+                  </Tooltip>
+                </div>
+                <TextField
+                  id="creds"
+                  defaultValue={server.credentialIds?.join(" ") ?? ""}
+                  onChange={(e: any) =>
+                    setServer({
+                      ...server,
+                      credentialIds: e.target.value
+                        .split(" ")
+                        .filter((id: string) => id.trim() !== "")
+                    })
+                  }
+                  disabled={props.editDisabled}
+                />
+              </>
+            )}
+            <Label
+              label="Number of decimals in depth log index"
+              style={labelStyle}
+            />
+            <TextField
+              id="depthLogDecimals"
+              defaultValue={server.depthLogDecimals}
+              variant={isNaN(server.depthLogDecimals) ? "error" : null}
+              helperText={
+                isNaN(server.depthLogDecimals)
+                  ? "Depth log decimals must be a valid positive integer"
+                  : ""
+              }
+              type="number"
+              onChange={(e: any) =>
+                setServer({
+                  ...server,
+                  depthLogDecimals: parseInt(e.target.value)
+                })
+              }
+              disabled={props.editDisabled}
+            />
+            <ButtonWrapper>
+              {connectionVerified && (
+                <Icons
+                  name="done"
+                  color={colors.interactive.primaryResting}
+                  size={32}
+                />
+              )}
+              <StyledButton
+                disabled={displayUrlError || connectionVerified}
+                onClick={showCredentialsModal}
+                color={"primary"}
+                colors={colors}
+                variant="outlined"
+              >
+                {"Test connection"}
+              </StyledButton>
+            </ButtonWrapper>
+          </ContentWrapper>
         </>
       }
       onSubmit={onSubmit}
       isLoading={isLoading}
       onDelete={server.id && !props.editDisabled ? showDeleteModal : null}
+      buttonPosition={ControlButtonPosition.TOP}
       confirmDisabled={props.editDisabled || !validateForm()}
+      width={ModalWidth.LARGE}
     />
   );
 };
@@ -187,7 +291,9 @@ const ServerModal = (props: ServerModalProps): React.ReactElement => {
 export const showDeleteServerModal = (
   server: Server,
   dispatchOperation: (action: HideModalAction | DisplayModalAction) => void,
-  dispatchNavigation: (action: SelectServerAction | RemoveWitsmlServerAction) => void,
+  dispatchNavigation: (
+    action: SelectServerAction | RemoveWitsmlServerAction
+  ) => void,
   selectedServer: Server
 ) => {
   const onCancel = () => {
@@ -197,9 +303,15 @@ export const showDeleteServerModal = (
     const abortController = new AbortController();
     try {
       await ServerService.removeServer(server.id, abortController.signal);
-      dispatchNavigation({ type: ModificationType.RemoveServer, payload: { serverUid: server.id } });
+      dispatchNavigation({
+        type: ModificationType.RemoveServer,
+        payload: { serverUid: server.id }
+      });
       if (server.id === selectedServer?.id) {
-        const action: SelectServerAction = { type: NavigationType.SelectServer, payload: { server: null } };
+        const action: SelectServerAction = {
+          type: NavigationType.SelectServer,
+          payload: { server: null }
+        };
         dispatchNavigation(action);
       }
     } catch (error) {
@@ -224,7 +336,10 @@ export const showDeleteServerModal = (
       switchButtonPlaces={true}
     />
   );
-  dispatchOperation({ type: OperationType.DisplayModal, payload: confirmModal });
+  dispatchOperation({
+    type: OperationType.DisplayModal,
+    payload: confirmModal
+  });
 };
 
 const isUrlValid = (url: string) => {
@@ -236,21 +351,24 @@ const isUrlValid = (url: string) => {
   }
 };
 
-const ServerAndButton = styled.div`
+const ContentWrapper = styled.div`
+  display: grid;
+  grid-template-columns: 12em 1fr;
+  align-items: center;
+  margin: 0.5rem 6rem 0.75rem 2.5rem;
+  row-gap: 1.5rem;
+`;
+
+const ButtonWrapper = styled.div`
+  grid-column: 2/3;
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
 `;
 
-const TestServerButton = styled(Button)`
-  && {
-    margin-left: 1em;
-  }
-  flex: 1 0 auto;
-`;
-
-const ThumbUpOutlinedIcon = styled(MuiThumbUpOutlinedIcon)<{ variant: string }>`
-  && {
-    height: 1.5em;
-  }
+const StyledButton = styled(Button)<{ colors: Colors }>`
+  white-space: nowrap;
+  color: ${(props) => props.colors.infographic.primaryMossGreen};
 `;
 
 export default ServerModal;

@@ -1,8 +1,13 @@
+using System;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 
 using WitsmlExplorer.Api.Configuration;
 using WitsmlExplorer.Api.Services;
@@ -11,11 +16,10 @@ namespace WitsmlExplorer.Api.HttpHandlers
 {
     public static class AuthorizeHandler
     {
-        public static async Task<IResult> Authorize([FromQuery(Name = "keep")] bool keep, [FromServices] ICredentialsService credentialsService, IConfiguration configuration, HttpContext httpContext)
+        public static async Task<IResult> Authorize([FromQuery(Name = "keep")] bool keep, [FromServices] ICredentialsService credentialsService, HttpContext httpContext)
         {
-            bool useOAuth2 = StringHelpers.ToBoolean(configuration[ConfigConstants.OAuth2Enabled]);
             EssentialHeaders eh = new(httpContext?.Request);
-            bool success = await credentialsService.VerifyAndCacheCredentials(eh, useOAuth2, keep);
+            bool success = await credentialsService.VerifyAndCacheCredentials(eh, keep, httpContext);
             if (success)
             {
                 return TypedResults.Ok();
@@ -27,14 +31,32 @@ namespace WitsmlExplorer.Api.HttpHandlers
         {
             bool useOAuth2 = StringHelpers.ToBoolean(configuration[ConfigConstants.OAuth2Enabled]);
             EssentialHeaders eh = new(httpContext?.Request);
-            string cacheClientId = useOAuth2 ? credentialsService.GetClaimFromToken(eh.GetBearerToken(), "sub") : eh.GetCookieValue();
             if (!useOAuth2)
             {
                 httpContext.Response.Cookies.Delete(EssentialHeaders.CookieName);
             }
-            credentialsService.RemoveCachedCredentials(cacheClientId);
+            string cacheId = credentialsService.GetCacheId(eh);
+            credentialsService.RemoveCachedCredentials(cacheId);
 
             return TypedResults.Ok();
+        }
+
+        public static string GenerateToken(IConfiguration configuration, HttpRequest request, [FromServices] ICredentialsService credentialsService)
+        {
+            EssentialHeaders eh = new(request);
+            string sub = credentialsService.GetClaimFromToken(eh.GetBearerToken(), "sub");
+
+            SymmetricSecurityKey securityKey = new(Encoding.UTF8.GetBytes(configuration[ConfigConstants.NotificationsKey]));
+            SigningCredentials credentials = new(securityKey, SecurityAlgorithms.HmacSha256);
+            Claim[] claims = new[]
+            {
+                new Claim("sub", sub),
+            };
+            JwtSecurityToken token = new(
+                claims: claims,
+                expires: DateTime.Now.AddDays(1),
+                signingCredentials: credentials);
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

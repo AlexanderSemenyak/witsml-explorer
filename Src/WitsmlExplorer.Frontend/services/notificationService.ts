@@ -1,14 +1,18 @@
 import * as signalR from "@microsoft/signalr";
-import { HttpTransportType, HubConnection } from "@microsoft/signalr";
+import { HubConnection } from "@microsoft/signalr";
+import { AlertSeverity } from "components/Alerts";
+import { msalEnabled } from "msal/MsalAuthProvider";
+import { ApiClient, getBaseUrl } from "services/apiClient";
 import { ISimpleEvent, SimpleEventDispatcher } from "ste-simple-events";
-import { getBaseUrl } from "./apiClient";
 
 export interface Notification {
   serverUrl: URL;
   isSuccess: boolean;
   message: string;
+  severity?: AlertSeverity;
   reason?: string;
   description?: ObjectDescription;
+  jobId?: string;
 }
 
 interface ObjectDescription {
@@ -23,10 +27,7 @@ export interface RefreshAction {
   serverUrl: URL;
   wellUid: string;
   wellboreUid?: string;
-  logObjectUid?: string;
-  messageObjectUid?: string;
-  trajectoryUid?: string;
-  wbGeometryUid?: string;
+  objectUid?: string;
 }
 
 export enum RefreshType {
@@ -42,6 +43,18 @@ export default class NotificationService {
   private _alertDispatcher = new SimpleEventDispatcher<Notification>();
   private _refreshDispatcher = new SimpleEventDispatcher<RefreshAction>();
   private _onConnectionStateChanged = new SimpleEventDispatcher<boolean>();
+  private static token: string | null = null;
+
+  private static async getToken(): Promise<string> {
+    if (this.token != null) {
+      return this.token;
+    }
+    const response = await ApiClient.get(`/api/credentials/token`);
+    if (response.ok) {
+      this.token = await response.text();
+      return this.token;
+    }
+  }
 
   private constructor() {
     let notificationURL = getBaseUrl().toString();
@@ -50,32 +63,36 @@ export default class NotificationService {
     }
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${notificationURL}notifications`, {
-        skipNegotiation: true,
-        transport: HttpTransportType.WebSockets
+        accessTokenFactory: msalEnabled
+          ? () => NotificationService.getToken()
+          : undefined
       })
-      .withAutomaticReconnect([3000, 5000, 10000])
-      .configureLogging(signalR.LogLevel.None)
-      .build();
+      ?.withAutomaticReconnect([3000, 5000, 10000])
+      ?.configureLogging(signalR.LogLevel.None)
+      ?.build();
 
-    this.hubConnection.on("jobFinished", (notification: Notification) => {
-      notification.isSuccess ? this._snackbarDispatcher.dispatch(notification) : this._alertDispatcher.dispatch(notification);
+    this.hubConnection?.on("jobFinished", (notification: Notification) => {
+      notification.isSuccess
+        ? this._snackbarDispatcher.dispatch(notification)
+        : this._alertDispatcher.dispatch(notification);
     });
 
-    this.hubConnection.on("refresh", (refreshAction: RefreshAction) => {
+    this.hubConnection?.on("refresh", (refreshAction: RefreshAction) => {
       this._refreshDispatcher.dispatch(refreshAction);
     });
 
-    this.hubConnection.onreconnecting(() => {
+    this.hubConnection?.onreconnecting(() => {
       this._onConnectionStateChanged.dispatch(false);
     });
-    this.hubConnection.onreconnected(() => {
+    this.hubConnection?.onreconnected(() => {
       this._onConnectionStateChanged.dispatch(true);
     });
-    this.hubConnection.onclose(() => {
+    this.hubConnection?.onclose(() => {
+      NotificationService.token = null;
       setTimeout(() => this.hubConnection.start(), 5000);
     });
 
-    this.hubConnection.start();
+    this.hubConnection?.start();
   }
 
   public get snackbarDispatcher(): SimpleEventDispatcher<Notification> {

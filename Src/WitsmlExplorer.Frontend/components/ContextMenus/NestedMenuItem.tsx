@@ -1,20 +1,37 @@
-import { Typography } from "@equinor/eds-core-react";
-import { ListItemIcon } from "@material-ui/core";
-import Menu from "@material-ui/core/Menu";
+import { Icon, Typography } from "@equinor/eds-core-react";
 import MenuItem, { MenuItemProps } from "@material-ui/core/MenuItem";
-import ArrowRight from "@material-ui/icons/ArrowRight";
-import React, { useImperativeHandle, useRef, useState } from "react";
-import { colors } from "../../styles/Colors";
-import { StyledIcon } from "./ContextMenuUtils";
+import { StyledMenu } from "components/ContextMenus/ContextMenu";
+import { StyledIcon } from "components/ContextMenus/ContextMenuUtils";
+import OperationContext from "contexts/operationContext";
+import React, {
+  useContext,
+  useImperativeHandle,
+  useRef,
+  useState
+} from "react";
 
 export interface NestedMenuItemProps extends Omit<MenuItemProps, "button"> {
   label: string;
-  ContainerProps?: React.HTMLAttributes<HTMLElement> & React.RefAttributes<HTMLElement | null>;
+  ContainerProps?: React.HTMLAttributes<HTMLElement> &
+    React.RefAttributes<HTMLElement | null>;
   icon?: string;
 }
 
-const NestedMenuItem = React.forwardRef<HTMLLIElement | null, NestedMenuItemProps>(function NestedMenuItem(props: NestedMenuItemProps, ref) {
-  const { label, children, icon, tabIndex: tabIndexProp, ContainerProps: ContainerPropsProp = {}, ...MenuItemProps } = props;
+const NestedMenuItem = React.forwardRef<
+  HTMLLIElement | null,
+  NestedMenuItemProps
+>(function NestedMenuItem(props: NestedMenuItemProps, ref) {
+  const {
+    label,
+    children,
+    icon,
+    tabIndex: tabIndexProp,
+    ContainerProps: ContainerPropsProp = {},
+    ...MenuItemProps
+  } = props;
+  const {
+    operationState: { colors }
+  } = useContext(OperationContext);
 
   const { ref: containerRefProp, ...ContainerProps } = ContainerPropsProp;
 
@@ -75,8 +92,14 @@ const NestedMenuItem = React.forwardRef<HTMLLIElement | null, NestedMenuItemProp
       containerRef.current?.focus();
     }
 
-    if (event.key === "ArrowRight" && event.target === containerRef.current && event.target === active) {
-      const firstChild = menuContainerRef.current?.children[0] as HTMLElement | undefined;
+    if (
+      event.key === "ArrowRight" &&
+      event.target === containerRef.current &&
+      event.target === active
+    ) {
+      const firstChild = menuContainerRef.current?.children[0] as
+        | HTMLElement
+        | undefined;
       firstChild?.focus();
     }
   };
@@ -88,15 +111,24 @@ const NestedMenuItem = React.forwardRef<HTMLLIElement | null, NestedMenuItemProp
   }
 
   return (
-    <div {...ContainerProps} ref={containerRef} onFocus={handleFocus} tabIndex={tabIndex} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} onKeyDown={handleKeyDown}>
+    <div
+      {...ContainerProps}
+      ref={containerRef}
+      onFocus={handleFocus}
+      tabIndex={tabIndex}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onKeyDown={handleKeyDown}
+    >
       <MenuItem {...MenuItemProps} ref={menuItemRef}>
-        <StyledIcon name={icon ?? "launch"} color={colors.interactive.primaryResting} />
+        <StyledIcon
+          name={icon ?? "launch"}
+          color={colors.interactive.primaryResting}
+        />
         <Typography color={"primary"}>{label}</Typography>
-        <ListItemIcon>
-          <ArrowRight />
-        </ListItemIcon>
+        <Icon name="arrowDropRight" />
       </MenuItem>
-      <Menu
+      <StyledMenu
         // Set pointer events to 'none' to prevent the invisible Popover div
         // from capturing events for clicks and hovers
         style={{ pointerEvents: "none" }}
@@ -116,11 +148,12 @@ const NestedMenuItem = React.forwardRef<HTMLLIElement | null, NestedMenuItemProp
         onClose={() => {
           setIsSubMenuOpen(false);
         }}
+        colors={colors}
       >
         <div ref={menuContainerRef} style={{ pointerEvents: "auto" }}>
           {children}
         </div>
-      </Menu>
+      </StyledMenu>
     </div>
   );
 });

@@ -1,13 +1,25 @@
-import { WITSML_INDEX_TYPE_DATE_TIME, WITSML_INDEX_TYPE_MD } from "../components/Constants";
-import BhaRun from "./bhaRun";
-import LogObject from "./logObject";
-import Measure from "./measure";
-import MessageObject from "./messageObject";
-import Rig from "./rig";
-import RiskObject from "./riskObject";
-import Trajectory from "./trajectory";
-import Tubular from "./tubular";
-import WbGeometryObject from "./wbGeometry";
+import {
+  WITSML_INDEX_TYPE_DATE_TIME,
+  WITSML_INDEX_TYPE_MD
+} from "components/Constants";
+import BhaRun from "models/bhaRun";
+import ChangeLog from "models/changeLog";
+import FluidsReport from "models/fluidsReport";
+import FormationMarker from "models/formationMarker";
+import LogObject from "models/logObject";
+import Measure from "models/measure";
+import MessageObject from "models/messageObject";
+import MudLog from "models/mudLog";
+import {
+  ObjectType,
+  ObjectTypeToModel,
+  pluralizeObjectType
+} from "models/objectType";
+import Rig from "models/rig";
+import RiskObject from "models/riskObject";
+import Trajectory from "models/trajectory";
+import Tubular from "models/tubular";
+import WbGeometryObject from "models/wbGeometry";
 
 export interface WellboreProperties {
   uid: string;
@@ -37,18 +49,28 @@ export interface WellboreProperties {
   dateTimeCreation?: string;
   dateTimeLastChange?: string;
   itemState?: string;
+  comments?: string;
+  objectCount?: ExpandableObjectsCount;
 }
 
-export default interface Wellbore extends WellboreProperties {
+export interface WellboreObjects {
   bhaRuns?: BhaRun[];
+  changeLogs?: ChangeLog[];
+  fluidsReports?: FluidsReport[];
+  formationMarkers?: FormationMarker[];
   logs?: LogObject[];
   rigs?: Rig[];
   trajectories?: Trajectory[];
   messages?: MessageObject[];
+  mudLogs?: MudLog[];
   tubulars?: Tubular[];
   risks?: RiskObject[];
-  wbGeometrys?: WbGeometryObject[];
+  wbGeometries?: WbGeometryObject[];
 }
+
+export type ExpandableObjectsCount = Partial<Record<ObjectType, number>>;
+
+export default interface Wellbore extends WellboreProperties, WellboreObjects {}
 
 export function emptyWellbore(): Wellbore {
   return {
@@ -66,57 +88,45 @@ export function emptyWellbore(): Wellbore {
     dateTimeLastChange: "",
     itemState: "",
     bhaRuns: [],
+    changeLogs: [],
+    fluidsReports: [],
+    formationMarkers: [],
     logs: [],
     rigs: [],
     trajectories: [],
     tubulars: [],
     messages: [],
+    mudLogs: [],
     risks: [],
-    wbGeometrys: []
+    wbGeometries: [],
+    objectCount: null
   };
 }
 
-export function wellboreHasChanges(wellbore: WellboreProperties, updatedWellbore: WellboreProperties): boolean {
+export function wellboreHasChanges(
+  wellbore: WellboreProperties,
+  updatedWellbore: WellboreProperties
+): boolean {
   return JSON.stringify(wellbore) !== JSON.stringify(updatedWellbore);
 }
 
-export const calculateWellboreNodeId = (wellbore: Wellbore): string => {
+export const calculateWellboreNodeId = (
+  wellbore: Wellbore | { wellUid: string; uid: string }
+): string => {
   return wellbore.wellUid + wellbore.uid;
 };
 
-export const calculateBhaRunGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "bhaRuns";
+export const calculateObjectGroupId = (
+  wellbore: Wellbore,
+  objectType: ObjectType
+): string => {
+  return calculateWellboreNodeId(wellbore) + objectType;
 };
 
-export const calculateRigGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "rigs";
-};
-
-export const calculateMessageGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "messages";
-};
-
-export const calculateRiskGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "risks";
-};
-
-export const calculateWbGeometryGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "wbGeometrys";
-};
-
-export const calculateLogGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "logs";
-};
-
-export const calculateTrajectoryGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "trajectories";
-};
-
-export const calculateTubularGroupId = (wellbore: Wellbore): string => {
-  return calculateWellboreNodeId(wellbore) + "tubulars";
-};
-
-export const calculateLogTypeId = (wellbore: Wellbore, logType: string): string => {
+export const calculateLogTypeId = (
+  wellbore: Wellbore,
+  logType: string
+): string => {
   return calculateWellboreNodeId(wellbore) + logType;
 };
 
@@ -128,7 +138,9 @@ export const calculateLogTypeTimeId = (wellbore: Wellbore): string => {
   return calculateLogTypeId(wellbore, WITSML_INDEX_TYPE_DATE_TIME);
 };
 
-export const getWellboreProperties = (wellbore: Wellbore): Map<string, string> => {
+export const getWellboreProperties = (
+  wellbore: Wellbore
+): Map<string, string> => {
   return new Map([
     ["Well", wellbore.wellName],
     ["UID Well", wellbore.wellUid],
@@ -136,3 +148,28 @@ export const getWellboreProperties = (wellbore: Wellbore): Map<string, string> =
     ["UID Wellbore", wellbore.uid]
   ]);
 };
+
+export function objectTypeToWellboreObjects(
+  objectType: ObjectType
+): keyof WellboreObjects {
+  return (objectType.charAt(0).toLowerCase() +
+    pluralizeObjectType(objectType).slice(1)) as keyof WellboreObjects;
+}
+
+export function getObjectsFromWellbore<Key extends ObjectType>(
+  wellbore: Wellbore,
+  objectType: Key
+): ObjectTypeToModel[Key][] {
+  return wellbore[
+    objectTypeToWellboreObjects(objectType)
+  ] as ObjectTypeToModel[Key][];
+}
+
+export function getObjectFromWellbore<Key extends ObjectType>(
+  wellbore: Wellbore,
+  uid: string,
+  objectType: Key
+): ObjectTypeToModel[Key] {
+  const objects = getObjectsFromWellbore(wellbore, objectType);
+  return objects?.find((object) => object.uid === uid);
+}

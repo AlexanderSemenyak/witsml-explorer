@@ -7,13 +7,13 @@ using Witsml.Extensions;
 
 namespace Witsml.Data
 {
-    public class WitsmlWbGeometry : ObjectOnWellbore<WitsmlWbGeometrys>
+    public class WitsmlWbGeometry : WitsmlObjectOnWellbore
     {
-        public override WitsmlWbGeometrys AsSingletonWitsmlList()
+        public override WitsmlWbGeometrys AsItemInWitsmlList()
         {
             return new WitsmlWbGeometrys()
             {
-                WbGeometrys = this.AsSingletonList()
+                WbGeometrys = this.AsItemInList()
             };
         }
 

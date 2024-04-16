@@ -1,12 +1,22 @@
-import { Autocomplete, Button, Checkbox, TextField, Typography } from "@equinor/eds-core-react";
+import {
+  Autocomplete,
+  Button,
+  Checkbox,
+  TextField,
+  Typography
+} from "@equinor/eds-core-react";
+import ModalDialog, { ModalWidth } from "components/Modals/ModalDialog";
+import { validText } from "components/Modals/ModalParts";
+import OperationContext from "contexts/operationContext";
+import OperationType from "contexts/operationType";
+import { Server } from "models/server";
 import React, { ChangeEvent, useContext, useEffect, useState } from "react";
+import AuthorizationService, {
+  AuthorizationStatus,
+  BasicServerCredentials
+} from "services/authorizationService";
 import styled from "styled-components";
-import OperationContext from "../../contexts/operationContext";
-import OperationType from "../../contexts/operationType";
-import { Server } from "../../models/server";
-import AuthorizationService, { AuthorizationStatus, BasicServerCredentials } from "../../services/authorizationService";
-import ModalDialog, { ModalWidth } from "./ModalDialog";
-import { validText } from "./ModalParts";
+import { Colors } from "styles/Colors";
 
 export interface UserCredentialsModalProps {
   server: Server;
@@ -16,25 +26,37 @@ export interface UserCredentialsModalProps {
   confirmText?: string;
 }
 
-const UserCredentialsModal = (props: UserCredentialsModalProps): React.ReactElement => {
+const UserCredentialsModal = (
+  props: UserCredentialsModalProps
+): React.ReactElement => {
   const { server, confirmText } = props;
-  const { dispatchOperation } = useContext(OperationContext);
+  const {
+    operationState: { colors },
+    dispatchOperation
+  } = useContext(OperationContext);
   const [username, setUsername] = useState<string>();
   const [password, setPassword] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const shouldFocusPasswordInput = !!username;
-  const [keepLoggedIn, setKeepLoggedIn] = useState<boolean>(AuthorizationService.getKeepLoggedInToServer(server.url));
+  const [keepLoggedIn, setKeepLoggedIn] = useState<boolean>(
+    AuthorizationService.getKeepLoggedInToServer(server.url)
+  );
 
   const getInitialUsername = (): string => {
     if (server.usernames == null || server.usernames.length == 0) {
       return null;
-    } else if (server.usernames.length > 1 && server.usernames[0] == server.currentUsername) {
+    } else if (
+      server.usernames.length > 1 &&
+      server.usernames[0] == server.currentUsername
+    ) {
       return server.usernames[1];
     }
     return server.usernames[0];
   };
-  const [selectedUsername, setSelectedUsername] = useState<string>(getInitialUsername());
+  const [selectedUsername, setSelectedUsername] = useState<string>(
+    getInitialUsername()
+  );
 
   useEffect(() => {
     if (server.currentUsername) {
@@ -79,9 +101,11 @@ const UserCredentialsModal = (props: UserCredentialsModalProps): React.ReactElem
             defaultValue={username}
             required
             variant={username?.length === 0 ? "error" : undefined}
-            helperText={username?.length === 0 ? "Username must be 1-7936 characters" : ""}
+            helperText={
+              username?.length === 0 ? "Username must be 1-7936 characters" : ""
+            }
             onChange={(e: any) => setUsername(e.target.value)}
-            style={{ marginBottom: 15 }}
+            style={{ marginBottom: 15, color: colors.text.staticIconsDefault }}
           />
           <TextField
             autoFocus={shouldFocusPasswordInput}
@@ -89,14 +113,18 @@ const UserCredentialsModal = (props: UserCredentialsModalProps): React.ReactElem
             label={"Password"}
             defaultValue={password}
             variant={password?.length === 0 ? "error" : undefined}
-            helperText={password?.length === 0 ? "Password must be 1-7936 characters" : ""}
+            helperText={
+              password?.length === 0 ? "Password must be 1-7936 characters" : ""
+            }
             type="password"
             autoComplete="current-password"
             onChange={(e: any) => setPassword(e.target.value)}
+            style={{ color: colors.text.staticIconsDefault }}
           />
           {server.usernames && server.usernames.length > 0 && (
             <Row>
               <Autocomplete
+                style={{ color: colors.text.staticIconsDefault }}
                 label="Switch to an already logged in user"
                 initialSelectedOptions={[selectedUsername]}
                 options={server.usernames}
@@ -105,15 +133,20 @@ const UserCredentialsModal = (props: UserCredentialsModalProps): React.ReactElem
                   setSelectedUsername(selectedItems[0]);
                 }}
               />
-              <Button onClick={() => props.onConnectionVerified(selectedUsername)}>Switch user</Button>
+              <Button
+                onClick={() => props.onConnectionVerified(selectedUsername)}
+              >
+                Switch user
+              </Button>
             </Row>
           )}
-          <Checkbox
+          <StyledCheckbox
             label={`Keep me logged in to this server for 24 hours`}
             defaultChecked={keepLoggedIn}
             onChange={(e: ChangeEvent<HTMLInputElement>) => {
               setKeepLoggedIn(e.target.checked);
             }}
+            colors={colors}
           />
         </>
       }
@@ -121,7 +154,10 @@ const UserCredentialsModal = (props: UserCredentialsModalProps): React.ReactElem
       confirmText={confirmText ?? "Login"}
       onSubmit={onVerifyConnection}
       onCancel={() => {
-        AuthorizationService.onAuthorizationChangeDispatch({ server, status: AuthorizationStatus.Cancel });
+        AuthorizationService.onAuthorizationChangeDispatch({
+          server,
+          status: AuthorizationStatus.Cancel
+        });
         dispatchOperation({ type: OperationType.HideModal });
         if (props.onCancel) {
           props.onCancel();
@@ -139,6 +175,15 @@ const Row = styled.div`
   justify-content: space-between;
   padding: 30px 0 20px 0;
   align-items: flex-end;
+`;
+
+const StyledCheckbox = styled(Checkbox)<{ colors: Colors }>`
+  span {
+    color: ${(props) => props.colors.text.staticIconsDefault};
+  }
+  span:hover {
+    background: ${(props) => props.colors.interactive.checkBoxHover};
+  }
 `;
 
 export default UserCredentialsModal;

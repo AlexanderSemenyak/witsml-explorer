@@ -1,16 +1,27 @@
-import { Button, ButtonGroup, TextField } from "@material-ui/core";
+import { Button } from "@equinor/eds-core-react";
+import { TextField } from "@material-ui/core";
 import React, { useEffect, useState } from "react";
 
 export interface AdjustNumberRangeModalProps {
   minValue: number;
   maxValue: number;
+  isDescending?: boolean;
   onStartValueChanged: (value: number) => void;
   onEndValueChanged: (value: number) => void;
   onValidChange: (isValid: boolean) => void;
 }
 
-const AdjustNumberRangeModal = (props: AdjustNumberRangeModalProps): React.ReactElement => {
-  const { minValue, maxValue, onStartValueChanged, onEndValueChanged, onValidChange } = props;
+const AdjustNumberRangeModal = (
+  props: AdjustNumberRangeModalProps
+): React.ReactElement => {
+  const {
+    minValue,
+    maxValue,
+    isDescending,
+    onStartValueChanged,
+    onEndValueChanged,
+    onValidChange
+  } = props;
   const [startValue, setStartIndex] = useState<number>(minValue);
   const [endValue, setEndIndex] = useState<number>(maxValue);
   const [startIndexIsValid, setStartIndexIsValid] = useState<boolean>();
@@ -24,21 +35,29 @@ const AdjustNumberRangeModal = (props: AdjustNumberRangeModalProps): React.React
   }, [startValue, endValue]);
 
   useEffect(() => {
-    setStartIndexIsValid(startValue < endValue);
-    setEndIndexIsValid(endValue > startValue);
+    setStartIndexIsValid(
+      isDescending ? startValue > endValue : endValue > startValue
+    );
+    setEndIndexIsValid(
+      isDescending ? startValue > endValue : endValue > startValue
+    );
   }, [startValue, endValue]);
 
   useEffect(() => {
     onValidChange(startIndexIsValid && endIndexIsValid);
   }, [startIndexIsValid, endIndexIsValid]);
 
-  const handleStartIndexChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStartIndexChanged = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     if (event.target.value) {
       setStartIndex(Number(event.target.value));
     }
   };
 
-  const handleEndIndexChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEndIndexChanged = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     if (event.target.value) {
       setEndIndex(Number(event.target.value));
     }
@@ -46,7 +65,10 @@ const AdjustNumberRangeModal = (props: AdjustNumberRangeModalProps): React.React
 
   return (
     <>
-      <ButtonGroup aria-label="set depth range button group" color="primary" style={{ margin: ".5rem" }}>
+      <Button.Group
+        aria-label="set depth range button group"
+        style={{ margin: ".5rem" }}
+      >
         {setRangeButtonValues.map((buttonValue) => {
           return (
             totalDepthSpan > buttonValue && (
@@ -71,24 +93,38 @@ const AdjustNumberRangeModal = (props: AdjustNumberRangeModalProps): React.React
         >
           Reset
         </Button>
-      </ButtonGroup>
+      </Button.Group>
       <TextField
         fullWidth
         label={"Start index"}
-        value={startValue}
+        value={startValue ?? ""}
         type={"number"}
         error={!startIndexIsValid}
-        helperText={startIndexIsValid ? "" : `Must be lower than ${endValue}`}
+        helperText={
+          startIndexIsValid
+            ? ""
+            : isDescending
+            ? `Must be higher than ${endValue}`
+            : `Must be lower than ${endValue}`
+        }
         onChange={handleStartIndexChanged}
+        style={{ paddingBottom: startIndexIsValid ? "23px" : 0 }}
       />
       <TextField
         fullWidth
         label={"End index"}
-        value={endValue}
+        value={endValue ?? ""}
         type={"number"}
         error={!endIndexIsValid}
-        helperText={endIndexIsValid ? "" : `Must be higher than ${maxValue}`}
+        helperText={
+          endIndexIsValid
+            ? ""
+            : isDescending
+            ? `Must be lower than ${startValue}`
+            : `Must be higher than ${startValue}`
+        }
         onChange={handleEndIndexChanged}
+        style={{ paddingBottom: endIndexIsValid ? "23px" : 0 }}
       />
     </>
   );

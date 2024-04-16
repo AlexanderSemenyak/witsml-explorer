@@ -1,73 +1,57 @@
-import { NextRouter, useRouter } from "next/router";
-import React, { useContext, useEffect, useState } from "react";
-import { NavigationAction } from "../contexts/navigationAction";
+import { WITSML_INDEX_TYPE_MD } from "components/Constants";
+import { FilterContext, WellFilterType } from "contexts/filter";
+import ModificationType from "contexts/modificationType";
 import {
-  SelectBhaRunGroupAction,
-  SelectLogObjectAction,
-  SelectMessageGroupAction,
-  SelectRigGroupAction,
-  SelectRiskGroupAction,
+  SelectLogTypeAction,
+  SelectObjectAction,
+  SelectObjectGroupAction,
   SelectServerAction,
-  SelectTrajectoryAction,
-  SelectTubularAction,
-  SelectWbGeometryAction,
   SelectWellAction,
-  SelectWellboreAction,
-  SetFilterAction
-} from "../contexts/navigationActions";
-import NavigationContext, { NavigationState } from "../contexts/navigationContext";
-import NavigationType from "../contexts/navigationType";
-import LogObject from "../models/logObject";
-import { Server } from "../models/server";
-import Trajectory from "../models/trajectory";
-import Tubular from "../models/tubular";
-import WbGeometryObject from "../models/wbGeometry";
-import Well from "../models/well";
+  SelectWellboreAction
+} from "contexts/navigationActions";
+import NavigationContext, { NavigationState } from "contexts/navigationContext";
+import NavigationType from "contexts/navigationType";
+import { ObjectType } from "models/objectType";
+import { Server } from "models/server";
+import Well from "models/well";
 import Wellbore, {
-  calculateBhaRunGroupId,
-  calculateMessageGroupId,
-  calculateRigGroupId,
-  calculateRiskGroupId,
-  calculateTrajectoryGroupId,
-  calculateTubularGroupId,
-  calculateWbGeometryGroupId
-} from "../models/wellbore";
-import { truncateAbortHandler } from "../services/apiClient";
-import BhaRunService from "../services/bhaRunService";
-import LogObjectService from "../services/logObjectService";
-import MessageObjectService from "../services/messageObjectService";
-import RigService from "../services/rigService";
-import RiskObjectService from "../services/riskObjectService";
-import TrajectoryService from "../services/trajectoryService";
-import TubularService from "../services/tubularService";
-import WbGeometryObjectService from "../services/wbGeometryService";
+  calculateLogTypeDepthId,
+  calculateLogTypeTimeId,
+  getObjectFromWellbore,
+  getObjectsFromWellbore
+} from "models/wellbore";
+import { useRouter } from "next/router";
+import { ParsedUrlQuery } from "querystring";
+import React, { useContext, useEffect, useState } from "react";
+import { truncateAbortHandler } from "services/apiClient";
+import NotificationService from "services/notificationService";
+import ObjectService from "services/objectService";
 
 const Routing = (): React.ReactElement => {
   const { dispatchNavigation, navigationState } = useContext(NavigationContext);
+  const { updateSelectedFilter } = React.useContext(FilterContext);
   const {
     selectedServer,
     servers,
     wells,
     selectedWell,
     selectedWellbore,
-    selectedLog,
-    selectedTubular,
-    selectedBhaRunGroup,
-    selectedMessageGroup,
-    selectedRigGroup,
-    selectedRiskGroup,
-    selectedTrajectory,
-    selectedWbGeometry
+    selectedObject,
+    selectedObjectGroup,
+    selectedLogTypeGroup
   } = navigationState;
   const router = useRouter();
-  const [isSyncingUrlAndState, setIsSyncingUrlAndState] = useState<boolean>(true);
+  const [isSyncingUrlAndState, setIsSyncingUrlAndState] =
+    useState<boolean>(true);
+  const [hasSelectedServer, setHasSelectedServer] = useState<boolean>(false);
   const [urlParams, setUrlParams] = useState<QueryParams>(null);
-  const [currentQueryParams, setCurrentQueryParams] = useState<QueryParams>(null);
+  const [currentQueryParams, setCurrentQueryParams] =
+    useState<QueryParams>(null);
 
   useEffect(() => {
     //set initial params state
     if (isSyncingUrlAndState) {
-      setUrlParams(getQueryParamsFromUrl(router));
+      setUrlParams(getQueryParamsFromUrl(router.query));
       setCurrentQueryParams(getQueryParamsFromState(navigationState));
     }
   }, [router]);
@@ -75,7 +59,10 @@ const Routing = (): React.ReactElement => {
   useEffect(() => {
     // update params on navigation state change
     setCurrentQueryParams(getQueryParamsFromState(navigationState));
-    const finishedSyncingStateAndUrl = isSyncingUrlAndState && urlParams && isQueryParamsEqual(urlParams, currentQueryParams);
+    const finishedSyncingStateAndUrl =
+      isSyncingUrlAndState &&
+      urlParams &&
+      isQueryParamsEqual(urlParams, currentQueryParams);
     if (finishedSyncingStateAndUrl) {
       setIsSyncingUrlAndState(false);
     }
@@ -83,14 +70,9 @@ const Routing = (): React.ReactElement => {
     selectedServer,
     selectedWell,
     selectedWellbore,
-    selectedLog,
-    selectedTubular,
-    selectedBhaRunGroup,
-    selectedMessageGroup,
-    selectedRigGroup,
-    selectedRiskGroup,
-    selectedTrajectory,
-    selectedWbGeometry
+    selectedObject,
+    selectedObjectGroup,
+    selectedLogTypeGroup
   ]);
 
   useEffect(() => {
@@ -107,10 +89,24 @@ const Routing = (): React.ReactElement => {
     // update selected server when servers are fetched
     if (isSyncingUrlAndState && urlParams) {
       const serverUrl = urlParams.serverUrl;
-      const server = servers.find((server: Server) => server.url === serverUrl);
+      if (serverUrl == null) {
+        return;
+      }
+      const server = servers.find(
+        (server: Server) => server.url.toLowerCase() === serverUrl.toLowerCase()
+      );
       if (server && !selectedServer) {
-        const action: SelectServerAction = { type: NavigationType.SelectServer, payload: { server } };
-        dispatchNavigation(action);
+        if (hasSelectedServer) {
+          // finish syncing if routing has already attempted to navigate to a server (such as on login cancellation)
+          setIsSyncingUrlAndState(false);
+        } else {
+          setHasSelectedServer(true);
+          const action: SelectServerAction = {
+            type: NavigationType.SelectServer,
+            payload: { server }
+          };
+          dispatchNavigation(action);
+        }
       }
     }
   }, [servers, urlParams]);
@@ -119,59 +115,75 @@ const Routing = (): React.ReactElement => {
     // update selected well when wells are fetched
     if (isSyncingUrlAndState && urlParams) {
       const wellUid = urlParams.wellUid;
-      if (wellUid && !selectedWell && wells.length > 0) {
+      if (wellUid != null && !selectedWell && wells.length > 0) {
         const well: Well = wells.find((w: Well) => w.uid === wellUid);
         if (well) {
-          const selectWellAction: SelectWellAction = { type: NavigationType.SelectWell, payload: { well, wellbores: well.wellbores } };
+          const selectWellAction: SelectWellAction = {
+            type: NavigationType.SelectWell,
+            payload: { well }
+          };
           dispatchNavigation(selectWellAction);
         } else {
+          NotificationService.Instance.alertDispatcher.dispatch({
+            serverUrl: new URL(selectedServer?.url),
+            message: `Well with UID ${wellUid} was not found on the current server.`,
+            isSuccess: false
+          });
           setIsSyncingUrlAndState(false);
         }
+      } else if (wellUid == null) {
+        setIsSyncingUrlAndState(false);
       }
     }
   }, [wells]);
 
   useEffect(() => {
     if (isSyncingUrlAndState && selectedWell) {
-      const setFilterAction: SetFilterAction = { type: NavigationType.SetFilter, payload: { filter: { ...navigationState.selectedFilter, wellName: selectedWell.name } } };
-      dispatchNavigation(setFilterAction);
+      updateSelectedFilter({
+        name: selectedWell.name,
+        filterType: WellFilterType.Well
+      });
     }
   }, [selectedWell]);
 
   useEffect(() => {
-    // fetch wellbore objects once a well is selected
-    const shouldNavigateToWellbore = isSyncingUrlAndState && selectedWell && urlParams?.wellboreUid && !selectedWellbore;
+    // navigate to the wellbore once the well is selected
+    const shouldNavigateToWellbore =
+      isSyncingUrlAndState &&
+      selectedWell &&
+      urlParams?.wellboreUid &&
+      !selectedWellbore;
     if (shouldNavigateToWellbore) {
       const wellboreUid = urlParams.wellboreUid.toString();
       const controller = new AbortController();
 
       const getChildren = async () => {
-        const getBhaRuns = BhaRunService.getBhaRuns(selectedWell.uid, wellboreUid, controller.signal);
-        const getLogs = LogObjectService.getLogs(selectedWell.uid, wellboreUid, controller.signal);
-        const getRigs = RigService.getRigs(selectedWell.uid, wellboreUid, controller.signal);
-        const getTrajectories = TrajectoryService.getTrajectories(selectedWell.uid, wellboreUid, controller.signal);
-        const getTubulars = TubularService.getTubulars(selectedWell.uid, wellboreUid, controller.signal);
-        const getMessages = MessageObjectService.getMessages(selectedWell.uid, wellboreUid, controller.signal);
-        const getRisks = RiskObjectService.getRisks(selectedWell.uid, wellboreUid, controller.signal);
-        const getWbGeometrys = WbGeometryObjectService.getWbGeometrys(selectedWell.uid, wellboreUid, controller.signal);
-        const [bhaRuns, logs, rigs, trajectories, messages, risks, tubulars, wbGeometrys] = await Promise.all([
-          getBhaRuns,
-          getLogs,
-          getRigs,
-          getTrajectories,
-          getMessages,
-          getRisks,
-          getTubulars,
-          getWbGeometrys
-        ]);
-        const wellbore: Wellbore = selectedWell.wellbores.find((wb: Wellbore) => wb.uid === wellboreUid);
+        const wellbore: Wellbore = selectedWell.wellbores.find(
+          (wb: Wellbore) => wb.uid === wellboreUid
+        );
         if (wellbore) {
           const selectWellbore: SelectWellboreAction = {
             type: NavigationType.SelectWellbore,
-            payload: { well: selectedWell, wellbore, bhaRuns, logs, rigs, trajectories, messages, risks, tubulars, wbGeometrys }
-          } as SelectWellboreAction;
+            payload: { well: selectedWell, wellbore }
+          };
           dispatchNavigation(selectWellbore);
+          const objectCount = await ObjectService.getExpandableObjectsCount(
+            wellbore
+          );
+          dispatchNavigation({
+            type: ModificationType.UpdateWellborePartial,
+            payload: {
+              wellboreUid: wellbore.uid,
+              wellUid: wellbore.wellUid,
+              wellboreProperties: { objectCount }
+            }
+          });
         } else {
+          NotificationService.Instance.alertDispatcher.dispatch({
+            serverUrl: new URL(selectedServer?.url),
+            message: `Wellbore with UID ${wellboreUid} was not found on the ${selectedWell.name} well.`,
+            isSuccess: false
+          });
           setIsSyncingUrlAndState(false);
         }
       };
@@ -180,90 +192,85 @@ const Routing = (): React.ReactElement => {
       return () => {
         controller.abort();
       };
+    } else if (selectedWell && urlParams?.wellboreUid == null) {
+      setIsSyncingUrlAndState(false);
     }
   }, [selectedWell]);
 
+  const [isFetchingObjects, setIsFetchingObjects] = useState(false);
   useEffect(() => {
-    if (isSyncingUrlAndState && selectedWellbore) {
-      const dispatch = (object: any, action: NavigationAction) => {
-        if (object) {
+    if (isSyncingUrlAndState && selectedWellbore && !isFetchingObjects) {
+      const group = urlParams?.group as ObjectType;
+      const objectUid = urlParams?.objectUid;
+      if (
+        group != null &&
+        getObjectsFromWellbore(selectedWellbore, group) == null
+      ) {
+        const fetchAndSelectObjectGroup = async () => {
+          setIsFetchingObjects(true);
+          const objects = await ObjectService.getObjects(
+            selectedWell.uid,
+            selectedWellbore.uid,
+            group
+          );
+          const action: SelectObjectGroupAction = {
+            type: NavigationType.SelectObjectGroup,
+            payload: {
+              objectType: group,
+              wellUid: selectedWell.uid,
+              wellboreUid: selectedWellbore.uid,
+              objects
+            }
+          };
           dispatchNavigation(action);
-        } else {
+          setIsFetchingObjects(false);
+        };
+        fetchAndSelectObjectGroup();
+        if (urlParams.logType == null && objectUid == null) {
           setIsSyncingUrlAndState(false);
         }
-      };
-
-      const bhaRunGroupUid = urlParams?.bhaRunGroupUid?.toString();
-      if (bhaRunGroupUid && !selectedBhaRunGroup) {
-        const action: SelectBhaRunGroupAction = {
-          type: NavigationType.SelectBhaRunGroup,
-          payload: { bhaRunGroup: calculateBhaRunGroupId(selectedWellbore), well: selectedWell, wellbore: selectedWellbore }
+      } else if (urlParams?.logType != null && objectUid == null) {
+        const logTypeGroup =
+          urlParams.logType == "depth"
+            ? calculateLogTypeDepthId(selectedWellbore)
+            : calculateLogTypeTimeId(selectedWellbore);
+        const action: SelectLogTypeAction = {
+          type: NavigationType.SelectLogType,
+          payload: {
+            well: selectedWell,
+            wellbore: selectedWellbore,
+            logTypeGroup: logTypeGroup
+          }
         };
-        dispatch(true, action);
-      }
-
-      const logObjectUid = urlParams?.logObjectUid?.toString();
-      if (logObjectUid && !selectedLog) {
-        const log = selectedWellbore.logs.find((l: LogObject) => l.uid === logObjectUid);
-        const selectLogObjectAction: SelectLogObjectAction = { type: NavigationType.SelectLogObject, payload: { log, well: selectedWell, wellbore: selectedWellbore } };
-        dispatch(log, selectLogObjectAction);
-      }
-
-      const messageGroupUid = urlParams?.messageGroupUid?.toString();
-      if (messageGroupUid && !selectedMessageGroup) {
-        const action: SelectMessageGroupAction = {
-          type: NavigationType.SelectMessageGroup,
-          payload: { messageGroup: calculateMessageGroupId(selectedWellbore), well: selectedWell, wellbore: selectedWellbore }
-        };
-        dispatch(true, action);
-      }
-
-      const rigGroupUid = urlParams?.rigGroupUid?.toString();
-      if (rigGroupUid && !selectedRigGroup) {
-        const action: SelectRigGroupAction = {
-          type: NavigationType.SelectRigGroup,
-          payload: { rigGroup: calculateRigGroupId(selectedWellbore), well: selectedWell, wellbore: selectedWellbore }
-        };
-        dispatch(true, action);
-      }
-
-      const riskGroupUid = urlParams?.riskGroupUid?.toString();
-      if (riskGroupUid && !selectedRiskGroup) {
-        const action: SelectRiskGroupAction = {
-          type: NavigationType.SelectRiskGroup,
-          payload: { riskGroup: calculateRiskGroupId(selectedWellbore), well: selectedWell, wellbore: selectedWellbore }
-        };
-        dispatch(true, action);
-      }
-
-      const trajectoryUid = urlParams?.trajectoryUid?.toString();
-      if (trajectoryUid && !selectedTrajectory) {
-        const trajectory = selectedWellbore.trajectories.find((t: Trajectory) => t.uid === trajectoryUid);
-        const selectTrajectoryAction: SelectTrajectoryAction = {
-          type: NavigationType.SelectTrajectory,
-          payload: { well: selectedWell, wellbore: selectedWellbore, trajectoryGroup: calculateTrajectoryGroupId(selectedWellbore), trajectory }
-        };
-        dispatch(trajectory, selectTrajectoryAction);
-      }
-
-      const tubularUid = urlParams?.tubularUid?.toString();
-      if (tubularUid && !selectedTubular) {
-        const tubular = selectedWellbore.tubulars.find((t: Tubular) => t.uid === tubularUid);
-        const selectTubularAction: SelectTubularAction = {
-          type: NavigationType.SelectTubular,
-          payload: { well: selectedWell, wellbore: selectedWellbore, tubularGroup: calculateTubularGroupId(selectedWellbore), tubular }
-        };
-        dispatch(tubular, selectTubularAction);
-      }
-
-      const wbGeometryUid = urlParams?.wbGeometryUid?.toString();
-      if (wbGeometryUid && !selectedWbGeometry) {
-        const wbGeometry = selectedWellbore.wbGeometrys.find((object: WbGeometryObject) => object.uid === wbGeometryUid);
-        const action: SelectWbGeometryAction = {
-          type: NavigationType.SelectWbGeometry,
-          payload: { well: selectedWell, wellbore: selectedWellbore, wbGeometryGroup: calculateWbGeometryGroupId(selectedWellbore), wbGeometry }
-        };
-        dispatch(wbGeometry, action);
+        dispatchNavigation(action);
+        setIsSyncingUrlAndState(false);
+      } else if (objectUid != null) {
+        const object = getObjectFromWellbore(
+          selectedWellbore,
+          objectUid,
+          group
+        );
+        if (object != null) {
+          const action: SelectObjectAction = {
+            type: NavigationType.SelectObject,
+            payload: {
+              object,
+              well: selectedWell,
+              wellbore: selectedWellbore,
+              objectType: group
+            }
+          };
+          dispatchNavigation(action);
+        } else {
+          NotificationService.Instance.alertDispatcher.dispatch({
+            serverUrl: new URL(selectedServer?.url),
+            message: `Unable to select an object of type ${group} with UID ${objectUid} on the ${selectedWellbore.name} wellbore as the object was not found.`,
+            isSuccess: false
+          });
+        }
+        setIsSyncingUrlAndState(false);
+      } else {
+        setIsSyncingUrlAndState(false);
       }
     }
   }, [selectedWellbore]);
@@ -271,45 +278,49 @@ const Routing = (): React.ReactElement => {
   return <></>;
 };
 
-const isQueryParamsEqual = (urlQp: QueryParams, stateQp: QueryParams): boolean => {
+const isQueryParamsEqual = (
+  urlQp: QueryParams,
+  stateQp: QueryParams
+): boolean => {
   if (Object.keys(urlQp).length !== Object.keys(urlQp).length) {
     return false;
   }
 
   return (Object.keys(urlQp) as (keyof typeof urlQp)[]).every((key) => {
-    return Object.prototype.hasOwnProperty.call(stateQp, key) && urlQp[key] === stateQp[key];
+    return (
+      Object.prototype.hasOwnProperty.call(stateQp, key) &&
+      urlQp[key] === stateQp[key]
+    );
   });
 };
 
-const getQueryParamsFromState = (state: NavigationState): QueryParams => {
+export const logTypeToQuery = (logType: string) => {
+  return logType.includes(WITSML_INDEX_TYPE_MD) ? "depth" : "time";
+};
+
+export const getQueryParamsFromState = (
+  state: NavigationState
+): QueryParams => {
   return {
     ...(state.selectedServer && { serverUrl: state.selectedServer.url }),
     ...(state.selectedWell && { wellUid: state.selectedWell.uid }),
     ...(state.selectedWellbore && { wellboreUid: state.selectedWellbore.uid }),
-    ...(state.selectedBhaRunGroup && { bhaRunGroupUid: "group" }),
-    ...(state.selectedLog && { logObjectUid: state.selectedLog.uid }),
-    ...(state.selectedMessageGroup && { messageGroupUid: "group" }),
-    ...(state.selectedRigGroup && { rigGroupUid: "group" }),
-    ...(state.selectedRiskGroup && { riskGroupUid: "group" }),
-    ...(state.selectedTrajectory && { trajectoryUid: state.selectedTrajectory.uid }),
-    ...(state.selectedTubular && { tubularUid: state.selectedTubular.uid }),
-    ...(state.selectedWbGeometry && { wbGeometryUid: state.selectedWbGeometry.uid })
+    ...(state.selectedObjectGroup && { group: state.selectedObjectGroup }),
+    ...(state.selectedLogTypeGroup && {
+      logType: logTypeToQuery(state.selectedLogTypeGroup)
+    }),
+    ...(state.selectedObject && { objectUid: state.selectedObject.uid })
   };
 };
 
-const getQueryParamsFromUrl = (router: NextRouter): QueryParams => {
+export const getQueryParamsFromUrl = (query: ParsedUrlQuery): QueryParams => {
   return {
-    ...(router.query.serverUrl && { serverUrl: router.query.serverUrl.toString() }),
-    ...(router.query.wellUid && { wellUid: router.query.wellUid.toString() }),
-    ...(router.query.wellboreUid && { wellboreUid: router.query.wellboreUid.toString() }),
-    ...(router.query.bhaRunGroupUid && { bhaRunGroupUid: router.query.bhaRunGroupUid.toString() }),
-    ...(router.query.logObjectUid && { logObjectUid: router.query.logObjectUid.toString() }),
-    ...(router.query.messageGroupUid && { messageGroupUid: router.query.messageGroupUid.toString() }),
-    ...(router.query.rigGroupUid && { rigGroupUid: router.query.rigGroupUid.toString() }),
-    ...(router.query.riskGroupUid && { riskGroupUid: router.query.riskGroupUid.toString() }),
-    ...(router.query.trajectoryUid && { trajectoryUid: router.query.trajectoryUid.toString() }),
-    ...(router.query.tubularUid && { tubularUid: router.query.tubularUid.toString() }),
-    ...(router.query.wbGeometryUid && { wbGeometryUid: router.query.wbGeometryUid.toString() })
+    ...(query.serverUrl && { serverUrl: query.serverUrl.toString() }),
+    ...(query.wellUid && { wellUid: query.wellUid.toString() }),
+    ...(query.wellboreUid && { wellboreUid: query.wellboreUid.toString() }),
+    ...(query.group && { group: query.group.toString() }),
+    ...(query.logType && { logType: query.logType.toString() }),
+    ...(query.objectUid && { objectUid: query.objectUid.toString() })
   };
 };
 
@@ -317,14 +328,9 @@ export interface QueryParams {
   serverUrl: string;
   wellUid?: string;
   wellboreUid?: string;
-  bhaRunGroupUid?: string;
-  logObjectUid?: string;
-  messageGroupUid?: string;
-  rigGroupUid?: string;
-  riskGroupUid?: string;
-  trajectoryUid?: string;
-  tubularUid?: string;
-  wbGeometryUid?: string;
+  group?: string;
+  logType?: string;
+  objectUid?: string;
 }
 
 export default Routing;

@@ -1,6 +1,6 @@
-import { ComponentType } from "../componentType";
-import ObjectOnWellbore, { toObjectReference } from "../objectOnWellbore";
-import ObjectReference from "./objectReference";
+import { ComponentType } from "models/componentType";
+import ObjectReference from "models/jobs/objectReference";
+import ObjectOnWellbore, { toObjectReference } from "models/objectOnWellbore";
 
 export default interface ComponentReferences {
   serverUrl?: string;
@@ -9,7 +9,17 @@ export default interface ComponentReferences {
   componentUids: string[];
 }
 
-export function createComponentReferences(uids: string[], parent: ObjectOnWellbore, componentType: ComponentType, serverUrl?: string): ComponentReferences {
+export interface CopyRangeClipboard extends ComponentReferences {
+  startIndex?: string;
+  endIndex?: string;
+}
+
+export function createComponentReferences(
+  uids: string[],
+  parent: ObjectOnWellbore,
+  componentType: ComponentType,
+  serverUrl?: string
+): ComponentReferences {
   return {
     serverUrl: serverUrl,
     parent: toObjectReference(parent),

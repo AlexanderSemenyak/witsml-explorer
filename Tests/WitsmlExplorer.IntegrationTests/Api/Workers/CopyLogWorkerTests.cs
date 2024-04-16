@@ -26,7 +26,7 @@ namespace WitsmlExplorer.IntegrationTests.Api.Workers
     public class CopyLogWorkerTests
     {
         private readonly CopyLogWorker _worker;
-        private readonly DeleteLogObjectsWorker _deleteLogsWorker;
+        private readonly DeleteObjectsWorker _deleteLogsWorker;
         private readonly IWitsmlClient _client;
         private readonly LogObjectService _logObjectService;
 
@@ -39,19 +39,18 @@ namespace WitsmlExplorer.IntegrationTests.Api.Workers
             loggerFactory.AddSerilog(Log.Logger);
             ILogger<CopyLogDataJob> logger = loggerFactory.CreateLogger<CopyLogDataJob>();
             CopyLogDataWorker copyLogDataWorker = new(witsmlClientProvider, logger);
-            ILogger<CopyLogJob> logger2 = loggerFactory.CreateLogger<CopyLogJob>();
+            ILogger<CopyObjectsJob> logger2 = loggerFactory.CreateLogger<CopyObjectsJob>();
             _worker = new CopyLogWorker(logger2, witsmlClientProvider, copyLogDataWorker);
             _logObjectService = new LogObjectService(witsmlClientProvider);
 
-            ILogger<DeleteLogObjectsJob> logger3 = loggerFactory.CreateLogger<DeleteLogObjectsJob>();
-            ILogger<DeleteUtils> logger4 = loggerFactory.CreateLogger<DeleteUtils>();
-            _deleteLogsWorker = new DeleteLogObjectsWorker(logger3, witsmlClientProvider, new DeleteUtils(logger4));
+            ILogger<DeleteObjectsJob> logger3 = loggerFactory.CreateLogger<DeleteObjectsJob>();
+            _deleteLogsWorker = new DeleteObjectsWorker(logger3, witsmlClientProvider);
         }
 
         [Fact(Skip = "Should only be run manually")]
         public async Task CopyLog()
         {
-            CopyLogJob job = new()
+            CopyObjectsJob job = new()
             {
                 Source = new ObjectReferences
                 {
@@ -86,18 +85,19 @@ namespace WitsmlExplorer.IntegrationTests.Api.Workers
             };
 
             await _deleteLogsWorker.Execute(
-                new DeleteLogObjectsJob
+                new DeleteObjectsJob
                 {
                     ToDelete = new ObjectReferences()
                     {
                         WellUid = "",
                         WellboreUid = "",
-                        ObjectUids = new string[] { logUid }
+                        ObjectUids = new string[] { logUid },
+                        ObjectType = EntityType.Log
                     }
                 }
                 );
 
-            CopyLogJob job = new()
+            CopyObjectsJob job = new()
             {
                 Source = sourceReference,
                 Target = new WellboreReference
@@ -118,11 +118,11 @@ namespace WitsmlExplorer.IntegrationTests.Api.Workers
             {
                 LogData sourceLogData = await _logObjectService.ReadLogData(sourceReference.WellUid,
                     sourceReference.WellboreUid, logUid,
-                    new List<string>(sourceLog.LogData.MnemonicList.Split(",")), currentIndex.Equals(Index.Start(sourceLog)),
-                    currentIndex.GetValueAsString(), endIndex.ToString());
+                    new List<string>(sourceLog.LogData.MnemonicList.Split(CommonConstants.DataSeparator)), currentIndex.Equals(Index.Start(sourceLog)),
+                    currentIndex.GetValueAsString(), endIndex.ToString(), false);
                 LogData targetLogData = await _logObjectService.ReadLogData(targetReference.WellUid, targetReference.WellboreUid, logUid,
-                    new List<string>(targetLog.LogData.MnemonicList.Split(",")), currentIndex.Equals(Index.Start(targetLog)),
-                    currentIndex.GetValueAsString(), endIndex.ToString());
+                    new List<string>(targetLog.LogData.MnemonicList.Split(CommonConstants.DataSeparator)), currentIndex.Equals(Index.Start(targetLog)),
+                    currentIndex.GetValueAsString(), endIndex.ToString(), false);
 
                 Assert.Equal(sourceLogData.EndIndex, targetLogData.EndIndex);
                 Assert.Equal(sourceLogData.CurveSpecifications.Count(), targetLogData.CurveSpecifications.Count());

@@ -1,8 +1,8 @@
+import { AssetsLoader } from "components/AssetsLoader";
 import { createGlobalStyle } from "styled-components";
-import { colors } from "../styles/Colors";
-import { AssetsLoader } from "./AssetsLoader";
+import { Colors } from "styles/Colors";
 
-const GlobalStyles = createGlobalStyle`
+const GlobalStyles = createGlobalStyle<{ colors: Colors }>`
   @font-face {
     font-family: "Equinor";
     src: url("${AssetsLoader.getAssetsRoot()}/assets/fonts/Equinor-Regular.woff2");
@@ -36,21 +36,28 @@ const GlobalStyles = createGlobalStyle`
 
   ::-webkit-scrollbar {
     background-color: transparent;
-    width: 6px;
-    height: 6px;
+    width: 12px;
+    height: 12px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: ${colors.interactive.disabledBorder};
+    background-color: ${(props) => props.colors.interactive.disabledBorder};
   }
 
   ::-webkit-scrollbar-track {
     background-color: transparent;
   }
 
+  ::-webkit-scrollbar-corner{
+    background-color:transparent;
+  }
+  ::placeholder {
+  color: ${(props) => props.colors.text.staticIconsDefault} !important;
+  }
+
   body {
     font-family: EquinorRegular, sans-serif;
-    background: #FFFFFF;
+    background:${(props) => props.colors.ui.backgroundDefault};
     font-size: 16px;
     margin: 0;
     height: 100vh;
@@ -86,14 +93,6 @@ const GlobalStyles = createGlobalStyle`
     font-size: 1em;
   }
 
-  #eds-dialog-container>div {
-    visibility: hidden;
-  }
-
-  #eds-dialog-container>div:last-of-type {
-    visibility: visible;
-  }
-
   .MuiListItem-container {
     .MuiListItemSecondaryAction-root {
       display: none;
@@ -104,6 +103,62 @@ const GlobalStyles = createGlobalStyle`
         display: block;
       }
     }
+  }
+
+  .MuiFormControl-root {
+    .MuiFormLabel-root {
+     color:${(props) => props.colors.text.staticTextLabel}
+    }
+    .MuiFormLabel-root.Mui-focused {
+      color:${(props) => props.colors.text.staticPropertyValue};
+    }
+    .MuiInput-underline:before {
+      border-bottom: 1px solid #9CA6AC;
+    }
+    .Mui-disabled {
+      color: #999999 !important;
+    }
+    .MuiTypography-colorTextSecondary {
+      color:${(props) => props.colors.text.staticIconsDefault};
+    }
+    .MuiFormHelperText-root {
+      color:${(props) => props.colors.text.staticIconsDefault};
+    }
+  }
+
+  input[type=text],input[type=password],input[type=number],textarea,textarea.MuiInputBase-input {
+    color:${(props) => props.colors.text.staticIconsDefault} ;
+  }
+
+  input[type=checkbox] + svg {
+    fill:${(props) => props.colors.infographic.primaryMossGreen}
+  }
+
+  ul[class*="List__StyledList"] {
+    background: ${(props) => props.colors.ui.backgroundLight};
+    li {
+      color: ${(props) => props.colors.text.staticIconsDefault} ;
+      background: ${(props) => props.colors.ui.backgroundLight};
+    }
+    li:hover {
+     text-decoration: none;
+     background-color: ${(props) =>
+       props.colors.interactive.contextMenuItemHover};
+    }
+  }
+
+  p[class*="Typography__StyledTypography"] {
+    color:${(props) => props.colors.text.staticIconsDefault};
+  }
+
+  @keyframes fadeToNormal {
+    from {
+      background-color: ${(props) => props.colors.interactive.successResting};
+    }
+  }
+
+  .fading-row {
+    animation: fadeToNormal 3s;
   }
 `;
 

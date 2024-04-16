@@ -1,45 +1,75 @@
 import { Menu } from "@material-ui/core";
+import OperationContext from "contexts/operationContext";
+import { MousePosition } from "contexts/operationStateReducer";
+import OperationType from "contexts/operationType";
 import React, { ReactElement, useContext } from "react";
-import OperationContext from "../../contexts/operationContext";
-import { MousePosition } from "../../contexts/operationStateReducer";
-import OperationType from "../../contexts/operationType";
+import styled from "styled-components";
+import { Colors } from "styles/Colors";
 
 interface ContextMenuProps {
   menuItems: ReactElement[];
 }
 
-export const preventContextMenuPropagation = (event: React.MouseEvent<HTMLLIElement | HTMLDivElement>): boolean => {
+export const preventContextMenuPropagation = (
+  event: React.MouseEvent<HTMLLIElement | HTMLDivElement>
+): boolean => {
   event.preventDefault();
   event.stopPropagation();
   return false;
 };
 
-export const getContextMenuPosition = (event: React.MouseEvent<HTMLLIElement | HTMLDivElement | HTMLButtonElement>): MousePosition => {
+export const getContextMenuPosition = (
+  event: React.MouseEvent<HTMLLIElement | HTMLDivElement | HTMLButtonElement>
+): MousePosition => {
   return { mouseX: event.clientX - 2, mouseY: event.clientY - 2 };
 };
 
 const ContextMenu = (props: ContextMenuProps): React.ReactElement => {
   const { operationState, dispatchOperation } = useContext(OperationContext);
-  const { contextMenu } = operationState;
+  const { contextMenu, colors } = operationState;
 
   const handleClose = () => {
     dispatchOperation({ type: OperationType.HideContextMenu });
   };
 
   return (
-    <Menu
+    <StyledMenu
       keepMounted
       open={contextMenu.position.mouseY !== null}
       onClose={handleClose}
       anchorReference="anchorPosition"
       anchorPosition={
-        contextMenu.position.mouseY !== null && contextMenu.position.mouseX !== null ? { top: contextMenu.position.mouseY, left: contextMenu.position.mouseX } : undefined
+        contextMenu.position.mouseY !== null &&
+        contextMenu.position.mouseX !== null
+          ? {
+              top: contextMenu.position.mouseY,
+              left: contextMenu.position.mouseX
+            }
+          : undefined
       }
       onContextMenu={preventContextMenuPropagation}
+      colors={colors}
     >
       {props.menuItems}
-    </Menu>
+    </StyledMenu>
   );
 };
+
+export const StyledMenu = styled(Menu)<{ colors: Colors }>`
+  .MuiPaper-root {
+    background: ${(props) => props.colors.ui.backgroundLight};
+    p {
+      color: ${(props) => props.colors.infographic.primaryMossGreen};
+    }
+    svg {
+      fill: ${(props) => props.colors.infographic.primaryMossGreen};
+    }
+    .MuiListItem-button:hover {
+      text-decoration: none;
+      background-color: ${(props) =>
+        props.colors.interactive.contextMenuItemHover};
+    }
+  }
+`;
 
 export default ContextMenu;

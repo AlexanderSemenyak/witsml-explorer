@@ -1,4 +1,11 @@
-import { AccountInfo, Configuration, InteractionRequiredAuthError, PublicClientApplication, RedirectRequest, SilentRequest } from "@azure/msal-browser";
+import {
+  AccountInfo,
+  Configuration,
+  InteractionRequiredAuthError,
+  PublicClientApplication,
+  RedirectRequest,
+  SilentRequest
+} from "@azure/msal-browser";
 import { AuthenticationResult } from "@azure/msal-common";
 
 export const authRequest: RedirectRequest = {
@@ -6,11 +13,6 @@ export const authRequest: RedirectRequest = {
 };
 
 export const msalEnabled = process.env.NEXT_PUBLIC_MSALENABLED;
-
-export enum SecurityScheme {
-  OAuth2 = "OAuth2",
-  Basic = "Basic"
-}
 
 export const adminRole = "admin";
 export const developerRole = "developer";
@@ -27,30 +29,40 @@ const msalConfig: Configuration = {
   }
 };
 
-export const msalInstance: PublicClientApplication = new PublicClientApplication(msalConfig);
+export const msalInstance: PublicClientApplication =
+  new PublicClientApplication(msalConfig);
 
 export async function getAccessToken(scopes: string[]): Promise<string | null> {
-  const accounts = msalInstance.getAllAccounts();
-  let accessToken = null;
-
-  if (accounts.length > 0) {
-    const request: SilentRequest & RedirectRequest = {
-      scopes: scopes,
-      account: accounts[0]
-    };
-
-    await msalInstance
-      .acquireTokenSilent(request)
-      .then((response: AuthenticationResult) => {
-        accessToken = response.accessToken;
-      })
-      .catch((error) => {
-        // acquireTokenSilent can fail for a number of reasons, fallback to interaction
-        if (error instanceof InteractionRequiredAuthError) {
-          msalInstance.acquireTokenRedirect(request);
+  let accounts = msalInstance.getAllAccounts();
+  if (accounts.length < 1) {
+    await new Promise<void>((resolve) => {
+      const intervalId = setInterval(() => {
+        accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+          resolve();
+          clearInterval(intervalId);
         }
-      });
+      }, 100);
+    });
   }
+
+  const request: SilentRequest & RedirectRequest = {
+    scopes: scopes,
+    account: accounts[0]
+  };
+
+  let accessToken = null;
+  await msalInstance
+    .acquireTokenSilent(request)
+    .then((response: AuthenticationResult) => {
+      accessToken = response.accessToken;
+    })
+    .catch((error) => {
+      // acquireTokenSilent can fail for a number of reasons, fallback to interaction
+      if (error instanceof InteractionRequiredAuthError) {
+        msalInstance.acquireTokenRedirect(request);
+      }
+    });
   return accessToken;
 }
 
@@ -68,7 +80,8 @@ export const getAccountInfo = (): AccountInfo | null => {
   return activeAccount;
 };
 
-export const getUserAppRoles = (): string[] => getAccountInfo()?.idTokenClaims?.roles ?? [];
+export const getUserAppRoles = (): string[] =>
+  getAccountInfo()?.idTokenClaims?.roles ?? [];
 
 export const getUsername = (): string | null => getAccountInfo()?.username;
 
@@ -81,7 +94,9 @@ export async function signOut(): Promise<void> {
 
   const logoutRequest = {
     account: activeAccount,
-    logoutHint: activeAccount ? (activeAccount.idTokenClaims as TokenClaims).login_hint : undefined
+    logoutHint: activeAccount
+      ? (activeAccount.idTokenClaims as TokenClaims).login_hint
+      : undefined
   };
 
   msalInstance.logoutRedirect(logoutRequest);

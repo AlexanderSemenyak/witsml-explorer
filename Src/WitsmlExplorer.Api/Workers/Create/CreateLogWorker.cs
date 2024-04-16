@@ -36,7 +36,7 @@ namespace WitsmlExplorer.Api.Workers.Create
             }
 
             Logger.LogInformation("Log object created. {jobDescription}", job.Description());
-            RefreshWellbore refreshAction = new(GetTargetWitsmlClientOrThrow().GetServerHostname(), job.LogObject.WellUid, job.LogObject.WellboreUid, RefreshType.Update);
+            RefreshObjects refreshAction = new(GetTargetWitsmlClientOrThrow().GetServerHostname(), job.LogObject.WellUid, job.LogObject.WellboreUid, EntityType.Log);
             WorkerResult workerResult = new(GetTargetWitsmlClientOrThrow().GetServerHostname(), true, $"Log object {job.LogObject.Name} created for {targetWellbore.Name}");
 
             return (workerResult, refreshAction);
@@ -56,6 +56,8 @@ namespace WitsmlExplorer.Api.Workers.Create
                     NameWellbore = targetWellbore.Name,
                     Uid = job.LogObject.Uid,
                     Name = job.LogObject.Name,
+                    RunNumber = job.LogObject.RunNumber,
+                    ServiceCompany = job.LogObject.ServiceCompany,
                     IndexType = indexType == IndexType.Depth ? WitsmlLog.WITSML_INDEX_TYPE_MD : WitsmlLog.WITSML_INDEX_TYPE_DATE_TIME,
                     IndexCurve = new WitsmlIndexCurve()
                     {
@@ -66,9 +68,9 @@ namespace WitsmlExplorer.Api.Workers.Create
                         Uid = Guid.NewGuid().ToString(),
                         Mnemonic = indexType.ToString(),
                         Unit = unit,
-                        TypeLogData = indexType == IndexType.Depth ? WitsmlLogCurveInfo.LOG_DATA_TYPE_DOUBLE : WitsmlLogCurveInfo.LOG_DATA_TYPE_DATETIME
-                    }.AsSingletonList()
-                }.AsSingletonList()
+                        TypeLogData = indexType == IndexType.Depth ? WitsmlLogCurveInfo.LogDataTypeDouble : WitsmlLogCurveInfo.LogDataTypeDatetime
+                    }.AsItemInList()
+                }.AsItemInList()
             };
         }
 
@@ -82,7 +84,7 @@ namespace WitsmlExplorer.Api.Workers.Create
         {
             WitsmlWellbores query = WellboreQueries.GetWitsmlWellboreByUid(logObject.WellUid, logObject.WellboreUid);
             WitsmlWellbores wellbores = await client.GetFromStoreAsync(query, new OptionsIn(ReturnElements.Requested));
-            return !wellbores.Wellbores.Any() ? null : wellbores.Wellbores.First();
+            return wellbores.Wellbores.FirstOrDefault();
         }
     }
 }

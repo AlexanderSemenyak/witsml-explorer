@@ -1,27 +1,19 @@
 enum NavigationType {
+  ExpandTreeNodes = "ExpandTreeNodes",
   ToggleTreeNode = "ToggleTreeNode",
+  CollapseTreeNodeChildren = "CollapseTreeNodeChildren",
   SelectServer = "SelectServer",
   SelectWell = "SelectWell",
   SelectWellbore = "SelectWellbore",
-  SelectBhaRunGroup = "SelectBhaRunGroup",
   SelectJobs = "SelectJobs",
-  SelectLogGroup = "SelectLogGroup",
+  SelectQueryView = "SelectQueryView",
   SelectLogType = "SelectLogType",
-  SelectLogObject = "SelectLogObject",
-  SelectMessageGroup = "SelectMessageGroup",
-  SelectRiskGroup = "SelectRiskGroup",
-  SelectRigGroup = "SelectRigGroup",
-  SelectRig = "SelectRig",
-  SelectTrajectoryGroup = "SelectTrajectoryGroup",
-  SelectTrajectory = "SelectTrajectory",
-  SelectTubularGroup = "SelectTubularGroup",
-  SelectTubular = "SelectTubular",
-  SelectWbGeometryGroup = "SelectWbGeometryGroup",
-  SelectWbGeometry = "SelectWbGeometry",
-  SetFilter = "SetFilter",
+  SelectObject = "SelectObject",
+  SelectObjectGroup = "SelectObjectGroup",
   SetCurveThreshold = "SetCurveThreshold",
   ShowCurveValues = "ShowCurveValues",
-  SelectServerManager = "SelectServerManager"
+  SelectServerManager = "SelectServerManager",
+  SelectObjectOnWellboreView = "SelectObjectOnWellboreView"
 }
 
 export default NavigationType;

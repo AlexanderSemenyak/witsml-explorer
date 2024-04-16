@@ -1,13 +1,6 @@
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-
 using Witsml.Data;
 using Witsml.Data.Measures;
 using Witsml.Extensions;
-
-using WitsmlExplorer.Api.Models;
-using WitsmlExplorer.Api.Services;
 
 namespace WitsmlExplorer.Api.Query
 {
@@ -23,8 +16,27 @@ namespace WitsmlExplorer.Api.Query
                     UidWell = wellUid,
                     UidWellbore = wellboreUid,
                     Name = "",
+                    Type = "",
+                    Category = "",
+                    SubCategory = "",
+                    ExtendCategory = "",
+                    AffectedPersonnel = new string[] { "" },
+                    DTimStart = "",
+                    DTimEnd = "",
+                    MdBitStart = WitsmlMeasureWithDatum.ToFetch(),
+                    MdBitEnd = WitsmlMeasureWithDatum.ToFetch(),
+                    SeverityLevel = "",
+                    ProbabilityLevel = "",
+                    Summary = "",
+                    Details = "",
                     CommonData = new WitsmlCommonData()
-                }.AsSingletonList()
+                    {
+                        ItemState = "",
+                        SourceName = "",
+                        DTimLastChange = "",
+                        DTimCreation = "",
+                    }
+                }.AsItemInList()
             };
         }
 
@@ -37,120 +49,7 @@ namespace WitsmlExplorer.Api.Query
                     Uid = riskUid,
                     UidWell = wellUid,
                     UidWellbore = wellboreUid
-                }.AsSingletonList()
-            };
-        }
-
-        public static WitsmlRisks QueryByIds(string wellUid, string wellboreUid, string[] riskUids)
-        {
-            return new WitsmlRisks
-            {
-                Risks = riskUids.Select((riskUid) => new WitsmlRisk
-                {
-                    Uid = riskUid,
-                    UidWell = wellUid,
-                    UidWellbore = wellboreUid
-                }).ToList()
-            };
-        }
-
-        public static WitsmlRisks QueryByNameAndDepth(string wellUid, string wellboreUid, string name, Measure mdBitStart, Measure mdBitEnd)
-        {
-            return new WitsmlRisks
-            {
-                Risks = new WitsmlRisk
-                {
-                    UidWell = wellUid,
-                    UidWellbore = wellboreUid,
-                    Name = name,
-                    MdBitStart = mdBitStart != null ? new WitsmlMeasuredDepthCoord { Uom = mdBitStart.Uom, Value = mdBitStart.Value.ToString(CultureInfo.InvariantCulture) } : null,
-                    MdBitEnd = mdBitEnd != null ? new WitsmlMeasuredDepthCoord { Uom = mdBitEnd.Uom, Value = mdBitEnd.Value.ToString(CultureInfo.InvariantCulture) } : null
-                }.AsSingletonList()
-            };
-        }
-
-        public static WitsmlRisks QueryBySource(string wellUid, string wellboreUid, string source, string extendCategory)
-        {
-            return new WitsmlRisks
-            {
-                Risks = new WitsmlRisk
-                {
-                    UidWell = wellUid,
-                    UidWellbore = wellboreUid,
-                    ExtendCategory = extendCategory,
-                    CommonData = new WitsmlCommonData
-                    {
-                        SourceName = source,
-                    },
-                }.AsSingletonList()
-            };
-        }
-
-        public static IEnumerable<WitsmlRisk> DeleteRiskQuery(string wellUid, string wellboreUid, string[] riskUids)
-        {
-            return riskUids.Select((riskUid) =>
-                new WitsmlRisk
-                {
-                    Uid = riskUid,
-                    UidWell = wellUid,
-                    UidWellbore = wellboreUid
-                }
-            );
-        }
-
-        public static IEnumerable<WitsmlRisk> CopyWitsmlRisks(WitsmlRisks risks, WitsmlWellbore targetWellbore)
-        {
-            return risks.Risks.Select((risk) =>
-            {
-                risk.UidWell = targetWellbore.UidWell;
-                risk.NameWell = targetWellbore.NameWell;
-                risk.UidWellbore = targetWellbore.Uid;
-                risk.NameWellbore = targetWellbore.Name;
-                return risk;
-            });
-        }
-
-        public static WitsmlRisks CreateRisk(Risk risk)
-        {
-            return new WitsmlRisks
-            {
-                Risks = new WitsmlRisk
-                {
-                    UidWell = risk.WellUid,
-                    NameWell = risk.WellName,
-                    UidWellbore = risk.WellboreUid,
-                    NameWellbore = risk.WellboreName,
-                    Uid = risk.Uid,
-                    Name = risk.Name,
-                    Type = risk.Type,
-                    Category = risk.Category,
-                    SubCategory = risk.SubCategory,
-                    ExtendCategory = risk.ExtendCategory,
-                    AffectedPersonnel = risk.AffectedPersonnel?.Length == 0 ? null : risk.AffectedPersonnel?.Split(", "),
-                    DTimStart = StringHelpers.ToUniversalDateTimeString(risk.DTimStart),
-                    DTimEnd = StringHelpers.ToUniversalDateTimeString(risk.DTimEnd),
-                    MdHoleStart = risk.MdHoleStart?.ToWitsml<WitsmlMeasureWithDatum>(),
-                    MdHoleEnd = risk.MdHoleEnd?.ToWitsml<WitsmlMeasureWithDatum>(),
-                    MdBitStart = risk.MdBitStart?.ToWitsml<WitsmlMeasureWithDatum>(),
-                    MdBitEnd = risk.MdBitEnd?.ToWitsml<WitsmlMeasureWithDatum>(),
-                    TvdHoleStart = risk.TvdHoleStart?.ToWitsml<WitsmlMeasureWithDatum>(),
-                    TvdHoleEnd = risk.TvdHoleEnd?.ToWitsml<WitsmlMeasureWithDatum>(),
-                    DiaHole = risk.DiaHole?.ToWitsml<WitsmlLengthMeasure>(),
-                    SeverityLevel = risk.SeverityLevel,
-                    ProbabilityLevel = risk.ProbabilityLevel,
-                    Summary = risk.Summary,
-                    Details = risk.Details,
-                    Identification = risk.Identification,
-                    Contingency = risk.Contigency,
-                    Mitigation = risk.Mitigation,
-                    CommonData = new WitsmlCommonData()
-                    {
-                        ItemState = risk.CommonData.ItemState,
-                        SourceName = risk.CommonData.SourceName,
-                        DTimCreation = null,
-                        DTimLastChange = null
-                    }
-                }.AsSingletonList()
+                }.AsItemInList()
             };
         }
     }

@@ -10,25 +10,7 @@ namespace WitsmlExplorer.Api.Query
 {
     public static class WellboreQueries
     {
-        public static WitsmlWellbores GetAllWitsmlWellbores()
-        {
-            return new WitsmlWellbores
-            {
-                Wellbores = new WitsmlWellbore
-                {
-                    Uid = "",
-                    UidWell = "",
-                    Name = "",
-                    NameWell = "",
-                    TypeWellbore = "",
-                    StatusWellbore = "",
-                    IsActive = "",
-                    CommonData = new WitsmlCommonData()
-                }.AsSingletonList()
-            };
-        }
-
-        public static WitsmlWellbores GetWitsmlWellboreByWell(string wellUid)
+        public static WitsmlWellbores GetWitsmlWellboreByWell(string wellUid = "")
         {
             return new WitsmlWellbores
             {
@@ -36,8 +18,17 @@ namespace WitsmlExplorer.Api.Query
                 {
                     Uid = "",
                     UidWell = wellUid,
+                    Name = "",
+                    NameWell = "",
+                    TypeWellbore = "",
+                    StatusWellbore = "",
+                    IsActive = "",
                     CommonData = new WitsmlCommonData()
-                }.AsSingletonList()
+                    {
+                        DTimCreation = "",
+                        DTimLastChange = ""
+                    }
+                }.AsItemInList()
             };
         }
 
@@ -51,7 +42,7 @@ namespace WitsmlExplorer.Api.Query
                     UidWell = wellUid,
                     Name = "",
                     NameWell = ""
-                }.AsSingletonList()
+                }.AsItemInList()
             };
         }
 
@@ -60,7 +51,7 @@ namespace WitsmlExplorer.Api.Query
             WitsmlWellbore witsmlWellbore = new()
             {
                 Uid = wellbore.Uid,
-                UidWell = wellbore.WellUid
+                UidWell = wellbore.WellUid,
             };
 
             if (!string.IsNullOrEmpty(wellbore.Name))
@@ -81,6 +72,11 @@ namespace WitsmlExplorer.Api.Query
             if (!string.IsNullOrEmpty(wellbore.NumGovt))
             {
                 witsmlWellbore.NumGovt = wellbore.NumGovt;
+            }
+
+            if (!string.IsNullOrEmpty(wellbore.WellborePurpose))
+            {
+                witsmlWellbore.PurposeWellbore = wellbore.WellborePurpose;
             }
 
             if (wellbore.DTimeKickoff != null)
@@ -133,9 +129,15 @@ namespace WitsmlExplorer.Api.Query
                 witsmlWellbore.DayTarget = new WitsmlDayMeasure { Uom = wellbore.DayTarget.Uom, Value = wellbore.DayTarget.Value.ToString(CultureInfo.InvariantCulture) };
             }
 
+            if (!string.IsNullOrEmpty(wellbore.Comments))
+            {
+                witsmlWellbore.CommonData ??= new WitsmlCommonData();
+                witsmlWellbore.CommonData.Comments = wellbore.Comments;
+            }
+
             return new WitsmlWellbores
             {
-                Wellbores = witsmlWellbore.AsSingletonList()
+                Wellbores = witsmlWellbore.AsItemInList()
             };
         }
 
@@ -157,7 +159,7 @@ namespace WitsmlExplorer.Api.Query
                         },
                         PurposeWellbore = wellbore.WellborePurpose
 
-                    }.AsSingletonList()
+                    }.AsItemInList()
                 }
                 : new WitsmlWellbores
                 {
@@ -168,7 +170,7 @@ namespace WitsmlExplorer.Api.Query
                         UidWell = wellbore.WellUid,
                         NameWell = wellbore.WellName,
                         PurposeWellbore = wellbore.WellborePurpose
-                    }.AsSingletonList()
+                    }.AsItemInList()
                 };
         }
 
@@ -180,7 +182,7 @@ namespace WitsmlExplorer.Api.Query
                 {
                     Uid = wellboreUid,
                     UidWell = wellUid
-                }.AsSingletonList()
+                }.AsItemInList()
             };
         }
     }

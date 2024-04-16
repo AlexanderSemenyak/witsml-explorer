@@ -1,75 +1,142 @@
+import { Typography } from "@equinor/eds-core-react";
+import {
+  ContentTable,
+  ContentTableColumn,
+  ContentTableRow,
+  ContentType
+} from "components/ContentViews/table";
+import { getContextMenuPosition } from "components/ContextMenus/ContextMenu";
+import WellboreContextMenu, {
+  WellboreContextMenuProps
+} from "components/ContextMenus/WellboreContextMenu";
+import formatDateString from "components/DateFormatter";
+import { useWellFilter } from "contexts/filter";
+import ModificationType from "contexts/modificationType";
+import NavigationContext from "contexts/navigationContext";
+import NavigationType from "contexts/navigationType";
+import OperationContext from "contexts/operationContext";
+import OperationType from "contexts/operationType";
+import Wellbore from "models/wellbore";
 import React, { useContext } from "react";
-import NavigationContext from "../../contexts/navigationContext";
-import NavigationType from "../../contexts/navigationType";
-import OperationContext from "../../contexts/operationContext";
-import OperationType from "../../contexts/operationType";
-import Wellbore from "../../models/wellbore";
-import BhaRunService from "../../services/bhaRunService";
-import LogObjectService from "../../services/logObjectService";
-import MessageObjectService from "../../services/messageObjectService";
-import RigService from "../../services/rigService";
-import RiskObjectService from "../../services/riskObjectService";
-import TrajectoryService from "../../services/trajectoryService";
-import TubularService from "../../services/tubularService";
-import WbGeometryObjectService from "../../services/wbGeometryService";
-import { getContextMenuPosition } from "../ContextMenus/ContextMenu";
-import WellboreContextMenu, { WellboreContextMenuProps } from "../ContextMenus/WellboreContextMenu";
-import formatDateString from "../DateFormatter";
-import { ContentTable, ContentTableColumn, ContentType } from "./table";
+import ObjectService from "services/objectService";
+
+export interface WellboreRow extends ContentTableRow, Wellbore {}
 
 export const WellboresListView = (): React.ReactElement => {
   const { navigationState, dispatchNavigation } = useContext(NavigationContext);
-  const { selectedWell, servers } = navigationState;
+  const { selectedWell } = navigationState;
+  const [selectedWellFiltered] = useWellFilter(
+    React.useMemo(() => (selectedWell ? [selectedWell] : []), [selectedWell]),
+    React.useMemo(() => ({ filterWellbores: true }), [])
+  );
   const {
     dispatchOperation,
-    operationState: { timeZone }
+    operationState: { timeZone, dateTimeFormat }
   } = useContext(OperationContext);
 
   const columns: ContentTableColumn[] = [
     { property: "name", label: "name", type: ContentType.String },
     { property: "wellType", label: "typeWellbore", type: ContentType.String },
-    { property: "wellStatus", label: "statusWellbore", type: ContentType.String },
+    {
+      property: "wellStatus",
+      label: "statusWellbore",
+      type: ContentType.String
+    },
     { property: "uid", label: "uid", type: ContentType.String },
-    { property: "dateTimeCreation", label: "commonData.dTimCreation", type: ContentType.DateTime },
-    { property: "dateTimeLastChange", label: "commonData.dTimLastChange", type: ContentType.DateTime }
+    {
+      property: "dateTimeCreation",
+      label: "commonData.dTimCreation",
+      type: ContentType.DateTime
+    },
+    {
+      property: "dateTimeLastChange",
+      label: "commonData.dTimLastChange",
+      type: ContentType.DateTime
+    }
   ];
 
-  const onContextMenu = (event: React.MouseEvent<HTMLLIElement>, wellbore: Wellbore) => {
-    const contextMenuProps: WellboreContextMenuProps = { dispatchNavigation, dispatchOperation, servers, wellbore };
+  const onContextMenu = (
+    event: React.MouseEvent<HTMLLIElement>,
+    wellbore: Wellbore,
+    checkedWellboreRows: WellboreRow[]
+  ) => {
+    const contextMenuProps: WellboreContextMenuProps = {
+      wellbore,
+      well: selectedWell,
+      checkedWellboreRows
+    };
     const position = getContextMenuPosition(event);
-    dispatchOperation({ type: OperationType.DisplayContextMenu, payload: { component: <WellboreContextMenu {...contextMenuProps} />, position } });
+    dispatchOperation({
+      type: OperationType.DisplayContextMenu,
+      payload: {
+        component: <WellboreContextMenu {...contextMenuProps} />,
+        position
+      }
+    });
   };
 
   const getTableData = () => {
-    return selectedWell.wellbores.map((wellbore) => {
-      return {
-        ...wellbore,
-        id: wellbore.uid,
-        dateTimeCreation: formatDateString(wellbore.dateTimeCreation, timeZone),
-        dateTimeLastChange: formatDateString(wellbore.dateTimeLastChange, timeZone)
-      };
-    });
+    return (
+      selectedWellFiltered?.wellbores?.map((wellbore) => {
+        return {
+          ...wellbore,
+          id: wellbore.uid,
+          dateTimeCreation: formatDateString(
+            wellbore.dateTimeCreation,
+            timeZone,
+            dateTimeFormat
+          ),
+          dateTimeLastChange: formatDateString(
+            wellbore.dateTimeLastChange,
+            timeZone,
+            dateTimeFormat
+          ),
+          wellbore: wellbore
+        };
+      }) ?? []
+    );
   };
 
-  const onSelect = async (wellbore: any) => {
-    const { wellUid, uid } = wellbore;
-
-    const controller = new AbortController();
-    const logs = await LogObjectService.getLogs(wellbore.wellUid, uid, controller.signal);
-    const rigs = await RigService.getRigs(wellUid, uid, controller.signal);
-    const trajectories = await TrajectoryService.getTrajectories(wellUid, uid, controller.signal);
-    const bhaRuns = await BhaRunService.getBhaRuns(wellUid, uid, controller.signal);
-    const tubulars = await TubularService.getTubulars(wellUid, uid, controller.signal);
-    const messages = await MessageObjectService.getMessages(wellUid, uid, controller.signal);
-    const risks = await RiskObjectService.getRisks(wellUid, uid, controller.signal);
-    const wbGeometrys = await WbGeometryObjectService.getWbGeometrys(wellUid, uid, controller.signal);
+  const onSelect = async (wellboreRow: any) => {
+    const wellbore: Wellbore = wellboreRow.wellbore;
     dispatchNavigation({
       type: NavigationType.SelectWellbore,
-      payload: { well: selectedWell, wellbore, bhaRuns, logs, rigs, trajectories, messages, risks, tubulars, wbGeometrys }
+      payload: { well: selectedWell, wellbore }
     });
+    if (wellbore.objectCount == null) {
+      const objectCount = await ObjectService.getExpandableObjectsCount(
+        wellbore
+      );
+      dispatchNavigation({
+        type: ModificationType.UpdateWellborePartial,
+        payload: {
+          wellboreUid: wellbore.uid,
+          wellUid: wellbore.wellUid,
+          wellboreProperties: { objectCount }
+        }
+      });
+    }
   };
 
-  return selectedWell && <ContentTable columns={columns} data={getTableData()} onSelect={onSelect} onContextMenu={onContextMenu} />;
+  return (
+    selectedWell &&
+    (selectedWell.wellbores.length > 0 && !selectedWellFiltered?.wellbores ? (
+      <Typography style={{ padding: "1rem" }}>
+        No wellbores match the current filter
+      </Typography>
+    ) : (
+      <ContentTable
+        viewId="wellboresListView"
+        columns={columns}
+        data={getTableData()}
+        onSelect={onSelect}
+        onContextMenu={onContextMenu}
+        downloadToCsvFileName="Wellbores"
+        checkableRows
+        showRefresh
+      />
+    ))
+  );
 };
 
 export default WellboresListView;

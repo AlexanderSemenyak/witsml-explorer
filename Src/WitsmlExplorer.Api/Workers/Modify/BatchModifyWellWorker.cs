@@ -26,7 +26,7 @@ namespace WitsmlExplorer.Api.Workers.Modify
             Verify(job.Wells);
 
             IEnumerable<WitsmlWells> wellsToUpdate = job.Wells.Select(WellQueries.UpdateWitsmlWell);
-            IEnumerable<Task<QueryResult>> updateWellTasks = wellsToUpdate.Select(wellToUpdate => GetTargetWitsmlClientOrThrow().UpdateInStoreAsync(wellToUpdate));
+            List<Task<QueryResult>> updateWellTasks = wellsToUpdate.Select(wellToUpdate => GetTargetWitsmlClientOrThrow().UpdateInStoreAsync(wellToUpdate)).ToList();
 
             Task resultTask = Task.WhenAll(updateWellTasks);
             await resultTask;
@@ -34,7 +34,7 @@ namespace WitsmlExplorer.Api.Workers.Modify
             if (resultTask.Status == TaskStatus.Faulted)
             {
                 const string errorMessage = "Failed to batch update well properties";
-                Logger.LogError("{ErrorMessage}. {jobDescription}}", errorMessage, job.Description());
+                Logger.LogError("{ErrorMessage}. {jobDescription}", errorMessage, job.Description());
                 return (new WorkerResult(GetTargetWitsmlClientOrThrow().GetServerHostname(), false, errorMessage), null);
             }
 

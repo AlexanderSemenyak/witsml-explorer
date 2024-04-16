@@ -10,9 +10,10 @@ namespace WitsmlExplorer.Api.Models
             Name = server.Name;
             Url = server.Url;
             Description = server.Description;
-            SecurityScheme = server.SecurityScheme;
             Roles = server.Roles;
+            CredentialIds = server.CredentialIds;
             Id = server.Id;
+            DepthLogDecimals = server.DepthLogDecimals;
         }
 
         [JsonPropertyName("usernames")]

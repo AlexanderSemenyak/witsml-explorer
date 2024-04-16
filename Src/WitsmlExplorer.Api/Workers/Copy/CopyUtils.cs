@@ -15,7 +15,7 @@ namespace WitsmlExplorer.Api.Workers.Copy
 
     public interface ICopyUtils
     {
-        public Task<(WorkerResult, RefreshAction)> CopyObjectsOnWellbore<T>(IWitsmlClient witsmlClient, IEnumerable<ObjectOnWellbore<T>> queries, RefreshAction refreshAction, string sourceWellUid, string sourceWellboreUid) where T : IWitsmlQueryType;
+        public Task<(WorkerResult, RefreshAction)> CopyObjectsOnWellbore(IWitsmlClient witsmlClient, IEnumerable<WitsmlObjectOnWellbore> queries, RefreshAction refreshAction, string sourceWellUid, string sourceWellboreUid);
     }
 
     public class CopyUtils : ICopyUtils
@@ -27,17 +27,17 @@ namespace WitsmlExplorer.Api.Workers.Copy
             _logger = logger;
         }
 
-        public async Task<(WorkerResult, RefreshAction)> CopyObjectsOnWellbore<T>(IWitsmlClient witsmlClient, IEnumerable<ObjectOnWellbore<T>> queries, RefreshAction refreshAction, string sourceWellUid, string sourceWellboreUid) where T : IWitsmlQueryType
+        public async Task<(WorkerResult, RefreshAction)> CopyObjectsOnWellbore(IWitsmlClient witsmlClient, IEnumerable<WitsmlObjectOnWellbore> queries, RefreshAction refreshAction, string sourceWellUid, string sourceWellboreUid)
         {
             bool error = false;
             List<string> successUids = new();
             string errorReason = null;
-            EntityDescription errorEnitity = null;
+            EntityDescription errorEntity = null;
             QueryResult[] results = await Task.WhenAll(queries.Select(async (query) =>
             {
                 try
                 {
-                    QueryResult result = await witsmlClient.AddToStoreAsync(query.AsSingletonWitsmlList());
+                    QueryResult result = await witsmlClient.AddToStoreAsync(query.AsItemInWitsmlList());
                     if (result.IsSuccessful)
                     {
                         _logger.LogInformation(
@@ -57,7 +57,7 @@ namespace WitsmlExplorer.Api.Workers.Copy
                         if (!error)
                         {
                             errorReason = result.Reason;
-                            errorEnitity = new EntityDescription
+                            errorEntity = new EntityDescription
                             {
                                 WellName = query.NameWell,
                                 WellboreName = query.NameWellbore,
@@ -73,12 +73,13 @@ namespace WitsmlExplorer.Api.Workers.Copy
                     _logger.LogError("An unexpected exception has occured: {ex}", ex);
                     throw;
                 }
-            }));
+            }).ToList());
 
-            string successString = successUids.Count > 0 ? $"Copied {queries.First().GetType().Name}s: {string.Join(", ", successUids)}." : "";
+            var typeName = queries.FirstOrDefault()?.GetType().Name;
+            string successString = successUids.Count > 0 ? $"Copied {typeName}s: {string.Join(", ", successUids)}." : "";
             return !error
                 ? (new WorkerResult(witsmlClient.GetServerHostname(), true, successString), refreshAction)
-                : (new WorkerResult(witsmlClient.GetServerHostname(), false, $"{successString} Failed to copy some {queries.First().GetType().Name}s", errorReason, errorEnitity), successUids.Count > 0 ? refreshAction : null);
+                : (new WorkerResult(witsmlClient.GetServerHostname(), false, $"{successString} Failed to copy some {typeName}s", errorReason, errorEntity), successUids.Count > 0 ? refreshAction : null);
         }
     }
 }

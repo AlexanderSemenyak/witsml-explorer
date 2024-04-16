@@ -1,7 +1,9 @@
 import { CellProps, Table } from "@equinor/eds-core-react";
-import { useCallback, useEffect, useState } from "react";
+import OperationContext from "contexts/operationContext";
+import { useCallback, useContext, useEffect, useState } from "react";
 import styled from "styled-components";
-import Icon from "../../../styles/Icons";
+import { Colors } from "styles/Colors";
+import Icon from "styles/Icons";
 
 export type SortDirection = "ascending" | "descending" | "none";
 
@@ -33,12 +35,17 @@ which will be displayed in the table without affecting sorting.
 */
 const SortableEdsTable = (props: SortableEdsTableProps): React.ReactElement => {
   const { columns, data, caption } = props;
+  const {
+    operationState: { colors }
+  } = useContext(OperationContext);
 
   const initColumns = (): Column[] =>
     columns.map((col) => {
       return {
         ...col,
-        ...(col.sortDirection === undefined ? { sortDirection: "none", isSorted: false } : { sortDirection: col.sortDirection, isSorted: true })
+        ...(col.sortDirection === undefined
+          ? { sortDirection: "none", isSorted: false }
+          : { sortDirection: col.sortDirection, isSorted: true })
       };
     });
   const [state, setState] = useState<State>({ columns: initColumns() });
@@ -80,10 +87,18 @@ const SortableEdsTable = (props: SortableEdsTableProps): React.ReactElement => {
         }
         const { sortDirection, accessor } = sortedCol;
         if (sortDirection === "ascending") {
-          return left[accessor] > right[accessor] ? 1 : left[accessor] < right[accessor] ? -1 : 0;
+          return left[accessor] > right[accessor]
+            ? 1
+            : left[accessor] < right[accessor]
+            ? -1
+            : 0;
         }
         if (sortDirection === "descending") {
-          return left[accessor] < right[accessor] ? 1 : left[accessor] > right[accessor] ? -1 : 0;
+          return left[accessor] < right[accessor]
+            ? 1
+            : left[accessor] > right[accessor]
+            ? -1
+            : 0;
         }
       }),
     [state.columns]
@@ -103,27 +118,42 @@ const SortableEdsTable = (props: SortableEdsTableProps): React.ReactElement => {
       <Table.Head sticky>
         <Table.Row>
           {state.columns.map((col) => (
-            <SortCell sort={col.sortDirection} key={`head-${col.accessor}`} onClick={col.sortDirection ? () => onSortClick(col) : undefined} isSorted={col.isSorted}>
+            <StyledTableHeadCell
+              colors={colors}
+              sort={col.sortDirection}
+              key={`head-${col.accessor}`}
+              onClick={col.sortDirection ? () => onSortClick(col) : undefined}
+              isSorted={col.isSorted}
+            >
               {col.name}
-              <Icon name={col.sortDirection === "descending" ? "arrowDown" : "arrowUp"} />
-            </SortCell>
+              <Icon
+                name={
+                  col.sortDirection === "descending" ? "arrowDown" : "arrowUp"
+                }
+              />
+            </StyledTableHeadCell>
           ))}
         </Table.Row>
       </Table.Head>
       <Table.Body>
         {state.cellValues?.map((row, index) => (
-          <Table.Row key={index}>
+          <StyledTableRow colors={colors} key={index}>
             {row.map((cellValue, i) => (
-              <Table.Cell key={i}>{cellValue}</Table.Cell>
+              <StyledTableCell colors={colors} key={i}>
+                {cellValue}
+              </StyledTableCell>
             ))}
-          </Table.Row>
+          </StyledTableRow>
         ))}
       </Table.Body>
     </Table>
   );
 };
 
-const toCellValues = (data: Record<string, any>[], columns: Column[]): string[][] =>
+const toCellValues = (
+  data: Record<string, any>[],
+  columns: Column[]
+): string[][] =>
   data.map((item) =>
     columns.map((column) =>
       typeof item[column.accessor + "Value"] !== "undefined"
@@ -134,7 +164,9 @@ const toCellValues = (data: Record<string, any>[], columns: Column[]): string[][
     )
   );
 
-const SortCell = styled(Table.Cell)<{ isSorted: boolean } & CellProps>`
+const StyledTableHeadCell = styled(Table.Cell)<
+  { isSorted: boolean; colors: Colors } & CellProps
+>`
   svg {
     visibility: ${({ isSorted }) => (isSorted ? "visible" : "hidden")};
   }
@@ -142,6 +174,31 @@ const SortCell = styled(Table.Cell)<{ isSorted: boolean } & CellProps>`
     svg {
       visibility: visible;
     }
+  }
+  && {
+    background-color: ${(props) =>
+      props.colors.interactive.tableHeaderFillResting};
+    color: ${(props) => props.colors.text.staticIconsDefault};
+  }
+`;
+
+export const StyledTableRow = styled(Table.Row)<{ colors: Colors }>`
+  &&& {
+    background-color: ${(props) => props.colors.ui.backgroundDefault};
+  }
+  &&&:nth-of-type(even) {
+    background-color: ${(props) =>
+      props.colors.interactive.tableHeaderFillResting};
+  }
+  &&&:hover {
+    background-color: ${(props) =>
+      props.colors.interactive.tableCellFillActivated};
+  }
+`;
+
+export const StyledTableCell = styled(Table.Cell)<{ colors: Colors }>`
+  p {
+    color: ${(props) => props.colors.text.staticIconsDefault};
   }
 `;
 

@@ -1,21 +1,42 @@
-import JobInfo from "../models/jobs/jobInfo";
-import { Server } from "../models/server";
-import { ApiClient } from "./apiClient";
-import AuthorizationService from "./authorizationService";
-import NotificationService from "./notificationService";
+import JobInfo from "models/jobs/jobInfo";
+import { Server } from "models/server";
+import { ApiClient } from "services/apiClient";
+import AuthorizationService from "services/authorizationService";
+import NotificationService from "services/notificationService";
 
 export default class JobService {
-  public static async orderJob(jobType: JobType, payload: Record<string, any>): Promise<any> {
-    const response = await ApiClient.post(`/api/jobs/${jobType}`, JSON.stringify(payload));
+  public static async orderJob(
+    jobType: JobType,
+    payload: Record<string, any>
+  ): Promise<any> {
+    const response = await ApiClient.post(
+      `/api/jobs/${jobType}`,
+      JSON.stringify(payload)
+    );
     return this.onResponse(jobType, response);
   }
 
-  public static async orderJobAtServer(jobType: JobType, payload: Record<string, any>, targetServer: Server, sourceServer: Server): Promise<any> {
-    const response = await ApiClient.post(`/api/jobs/${jobType}`, JSON.stringify(payload), undefined, targetServer, sourceServer);
+  public static async orderJobAtServer(
+    jobType: JobType,
+    payload: Record<string, any>,
+    targetServer: Server,
+    sourceServer: Server
+  ): Promise<any> {
+    const response = await ApiClient.post(
+      `/api/jobs/${jobType}`,
+      JSON.stringify(payload),
+      undefined,
+      targetServer,
+      sourceServer
+    );
     return this.onResponse(jobType, response, targetServer);
   }
 
-  private static async onResponse(jobType: JobType, response: Response, server = AuthorizationService.selectedServer): Promise<any> {
+  private static async onResponse(
+    jobType: JobType,
+    response: Response,
+    server = AuthorizationService.selectedServer
+  ): Promise<any> {
     AuthorizationService.resetSourceServer();
     if (response.ok) {
       NotificationService.Instance.snackbarDispatcher.dispatch({
@@ -23,7 +44,7 @@ export default class JobService {
         message: `Ordered ${jobType} job`,
         isSuccess: true
       });
-      return response.body;
+      return response.json();
     } else {
       NotificationService.Instance.snackbarDispatcher.dispatch({
         serverUrl: new URL(server?.url),
@@ -34,7 +55,24 @@ export default class JobService {
     }
   }
 
-  public static async getUserJobInfos(abortSignal?: AbortSignal): Promise<JobInfo[]> {
+  public static async getUserJobInfo(
+    jobId: string,
+    abortSignal?: AbortSignal
+  ): Promise<JobInfo> {
+    const response = await ApiClient.get(
+      `/api/jobs/userjobinfo/${jobId}`,
+      abortSignal
+    );
+    if (response.ok) {
+      return response.json();
+    } else {
+      return null;
+    }
+  }
+
+  public static async getUserJobInfos(
+    abortSignal?: AbortSignal
+  ): Promise<JobInfo[]> {
     const response = await ApiClient.get(`/api/jobs/userjobinfos`, abortSignal);
     if (response.ok) {
       return response.json();
@@ -43,7 +81,9 @@ export default class JobService {
     }
   }
 
-  public static async getAllJobInfos(abortSignal?: AbortSignal): Promise<JobInfo[]> {
+  public static async getAllJobInfos(
+    abortSignal?: AbortSignal
+  ): Promise<JobInfo[]> {
     const response = await ApiClient.get(`/api/jobs/alljobinfos`, abortSignal);
     if (response.ok) {
       return response.json();
@@ -54,50 +94,42 @@ export default class JobService {
 }
 
 export enum JobType {
+  CheckLogHeader = "CheckLogHeader",
   CreateWell = "CreateWell",
-  CopyBhaRun = "CopyBhaRun",
-  CopyLog = "CopyLog",
+  CopyComponents = "CopyComponents",
   CopyLogData = "CopyLogData",
-  CopyRig = "CopyRig",
-  CopyRisk = "CopyRisk",
-  CopyTrajectory = "CopyTrajectory",
-  CopyTrajectoryStations = "CopyTrajectoryStations",
-  CopyTubular = "CopyTubular",
-  CopyTubularComponents = "CopyTubularComponents",
-  CopyWbGeometrySections = "CopyWbGeometrySections",
+  CopyObjects = "CopyObjects",
+  CopyWell = "CopyWell",
+  CopyWellbore = "CopyWellbore",
+  CopyWithParent = "CopyWithParent",
+  CopyObjectsWithParent = "CopyObjectsWithParent",
   CreateWellbore = "CreateWellbore",
   CreateLogObject = "CreateLogObject",
-  DeleteBhaRuns = "DeleteBhaRuns",
+  CreateRig = "CreateRig",
+  CreateTrajectory = "CreateTrajectory",
+  DeleteComponents = "DeleteComponents",
   DeleteCurveValues = "DeleteCurveValues",
-  DeleteLogObjects = "DeleteLogObjects",
-  DeleteMessageObjects = "DeleteMessageObjects",
-  DeleteMnemonics = "DeleteMnemonics",
-  DeleteRigs = "DeleteRigs",
-  DeleteRisks = "DeleteRisks",
-  DeleteWbGeometrys = "DeleteWbGeometrys",
+  DeleteObjects = "DeleteObjects",
   DeleteWell = "DeleteWell",
   DeleteWellbore = "DeleteWellbore",
-  DeleteTrajectories = "DeleteTrajectories",
-  DeleteTrajectoryStations = "DeleteTrajectoryStations",
-  DeleteTubulars = "DeleteTubular",
-  DeleteTubularComponents = "DeleteTubularComponents",
-  DeleteWbGeometrySections = "DeleteWbGeometrySections",
-  ModifyBhaRun = "ModifyBhaRun",
-  ModifyLogObject = "ModifyLogObject",
-  ModifyMessageObject = "ModifyMessageObject",
-  ModifyRig = "ModifyRig",
-  ModifyRisk = "ModifyRisk",
-  RenameMnemonic = "RenameMnemonic",
+  MissingData = "MissingData",
+  ModifyGeologyInterval = "ModifyGeologyInterval",
+  ModifyLogCurveInfo = "ModifyLogCurveInfo",
+  DeleteEmptyMnemonics = "DeleteEmptyMnemonics",
   ModifyTrajectoryStation = "ModifyTrajectoryStation",
-  ModifyTubular = "ModifyTubular",
   ModifyTubularComponent = "ModifyTubularComponent",
-  ModifyWbGeometry = "ModifyWbGeometry",
   ModifyWbGeometrySection = "ModifyWbGeometrySection",
   ModifyWell = "ModifyWell",
   ModifyWellbore = "ModifyWellbore",
+  ModifyObjectOnWellbore = "ModifyObjectOnWellbore",
+  BatchModifyObjectsOnWellbore = "BatchModifyObjectsOnWellbore",
   TrimLogObject = "TrimLogObject",
   BatchModifyWell = "BatchModifyWell",
   ImportLogData = "ImportLogData",
-  ReplaceLogData = "ReplaceLogData",
-  ReplaceLogObjects = "ReplaceLogObjects"
+  ReplaceComponents = "ReplaceComponents",
+  ReplaceObjects = "ReplaceObjects",
+  AnalyzeGaps = "AnalyzeGaps",
+  SpliceLogs = "SpliceLogs",
+  CompareLogData = "CompareLogData",
+  CountLogDataRows = "CountLogDataRows"
 }

@@ -3,10 +3,11 @@ export interface Server {
   name: string;
   description: string;
   url: string;
-  securityscheme: string;
   roles: string[];
+  credentialIds: string[];
   currentUsername?: string;
   usernames?: string[];
+  depthLogDecimals: number;
 }
 
 export function emptyServer(): Server {
@@ -15,9 +16,10 @@ export function emptyServer(): Server {
     name: "",
     description: "",
     url: "",
-    securityscheme: "Basic",
     roles: [],
+    credentialIds: [],
     currentUsername: undefined,
-    usernames: []
+    usernames: [],
+    depthLogDecimals: 0
   };
 }

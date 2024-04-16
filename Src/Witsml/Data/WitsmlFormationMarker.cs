@@ -1,31 +1,19 @@
 using System.Xml.Serialization;
 
 using Witsml.Data.Measures;
+using Witsml.Extensions;
 
 namespace Witsml.Data
 {
-    public class WitsmlFormationMarker
+    public class WitsmlFormationMarker : WitsmlObjectOnWellbore
     {
-        [XmlAttribute("uidWell")]
-        public string UidWell { get; init; }
-
-        [XmlAttribute("uidWellbore")]
-        public string UidWellbore { get; init; }
-
-        [XmlAttribute("uid")]
-        public string Uid { get; init; }
-
-        [XmlElement("nameWell")]
-        public string NameWell { get; init; }
-
-        [XmlElement("nameWellbore")]
-        public string NameWellbore { get; init; }
-
-        [XmlElement("name")]
-        public string Name { get; init; }
-
-        [XmlElement("description")]
-        public string Description { get; init; }
+        public override WitsmlFormationMarkers AsItemInWitsmlList()
+        {
+            return new WitsmlFormationMarkers()
+            {
+                FormationMarkers = this.AsItemInList()
+            };
+        }
 
         [XmlElement("mdPrognosed")]
         public WitsmlMeasuredDepthCoord MdPrognosed { get; init; }
@@ -59,6 +47,21 @@ namespace Witsml.Data
 
         [XmlElement("dipDirection")]
         public WitsmlPlaneAngleMeasure DipDirection { get; init; }
+
+        [XmlElement("lithostratigraphic")]
+        public WitsmlLithostratigraphyStruct Lithostratigraphic { get; init; }
+
+        [XmlElement("chronostratigraphic")]
+        public WitsmlChronostratigraphyStruct Chronostratigraphic { get; init; }
+
+        /// <summary>
+        /// Deprecated as of WITSML version 1.4.1.1"
+        /// </summary>
+        [XmlElement("nameFormation")]
+        public string NameFormation { get; init; }
+
+        [XmlElement("description")]
+        public string Description { get; init; }
 
         [XmlElement("commonData")]
         public WitsmlCommonData CommonData { get; init; }

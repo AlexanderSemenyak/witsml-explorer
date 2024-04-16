@@ -16,7 +16,6 @@ namespace WitsmlExplorer.IntegrationTests.Witsml.GetFromStore
     public class LogObjectTests
     {
         private readonly WitsmlClient _client;
-        private readonly WitsmlClientCapabilities _clientCapabilities = new();
         private const string IsoPattern = "yyyy-MM-ddTHH:mm:ss.fffZ";
 
         private const string UidWell = "bbd34996-a1f6-4767-8b02-5e3b46a990e8";
@@ -30,7 +29,11 @@ namespace WitsmlExplorer.IntegrationTests.Witsml.GetFromStore
         public LogObjectTests()
         {
             var config = ConfigurationReader.GetWitsmlConfiguration();
-            _client = new WitsmlClient(config.Hostname, config.Username, config.Password, _clientCapabilities);
+            _client = new WitsmlClient(options =>
+            {
+                options.Hostname = config.Hostname;
+                options.Credentials = new WitsmlCredentials(config.Username, config.Password);
+            });
         }
 
         [Fact(Skip = "Should only be run manually")]
@@ -94,11 +97,11 @@ namespace WitsmlExplorer.IntegrationTests.Witsml.GetFromStore
                     UidWell = UidWellDepth,
                     UidWellbore = UidWellboreDepth
 
-                }.AsSingletonList()
+                }.AsItemInList()
             };
 
             var result = await _client.GetFromStoreAsync(query, new OptionsIn(ReturnElements.All));
-            var witsmlLog = result.Logs.FirstOrDefault();
+            var witsmlLog = result.Logs.First();
             var data = witsmlLog.LogData.Data;
             data.First().GetRow(); // Test fails if parsing error on GetRow() due to incompatible culture setting.
         }

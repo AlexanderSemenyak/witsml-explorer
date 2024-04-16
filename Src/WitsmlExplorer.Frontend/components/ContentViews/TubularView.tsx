@@ -1,12 +1,21 @@
+import {
+  ContentTable,
+  ContentTableColumn,
+  ContentTableRow,
+  ContentType
+} from "components/ContentViews/table";
+import { getContextMenuPosition } from "components/ContextMenus/ContextMenu";
+import TubularComponentContextMenu, {
+  TubularComponentContextMenuProps
+} from "components/ContextMenus/TubularComponentContextMenu";
+import NavigationContext from "contexts/navigationContext";
+import OperationContext from "contexts/operationContext";
+import OperationType from "contexts/operationType";
+import { ComponentType } from "models/componentType";
+import Tubular from "models/tubular";
+import TubularComponent from "models/tubularComponent";
 import React, { useContext, useEffect, useState } from "react";
-import NavigationContext from "../../contexts/navigationContext";
-import OperationContext from "../../contexts/operationContext";
-import OperationType from "../../contexts/operationType";
-import TubularComponent from "../../models/tubularComponent";
-import TubularService from "../../services/tubularService";
-import { getContextMenuPosition } from "../ContextMenus/ContextMenu";
-import TubularComponentContextMenu, { TubularComponentContextMenuProps } from "../ContextMenus/TubularComponentContextMenu";
-import { ContentTable, ContentTableColumn, ContentTableRow, ContentType } from "./table";
+import ComponentService from "services/componentService";
 
 export interface TubularComponentRow extends ContentTableRow {
   uid: string;
@@ -22,10 +31,13 @@ export interface TubularComponentRow extends ContentTableRow {
 
 export const TubularView = (): React.ReactElement => {
   const { navigationState, dispatchNavigation } = useContext(NavigationContext);
-  const { selectedServer, selectedTubular, servers } = navigationState;
-  const [tubularComponents, setTubularComponents] = useState<TubularComponent[]>([]);
+  const { selectedServer, selectedObject, servers } = navigationState;
+  const [tubularComponents, setTubularComponents] = useState<
+    TubularComponent[]
+  >([]);
   const { dispatchOperation } = useContext(OperationContext);
   const [isFetchingData, setIsFetchingData] = useState<boolean>(true);
+  const selectedTubular = selectedObject as Tubular;
 
   useEffect(() => {
     setIsFetchingData(true);
@@ -33,7 +45,16 @@ export const TubularView = (): React.ReactElement => {
       const abortController = new AbortController();
 
       const getTubular = async () => {
-        setTubularComponents(await TubularService.getTubularComponents(selectedTubular.wellUid, selectedTubular.wellboreUid, selectedTubular.uid, abortController.signal));
+        setTubularComponents(
+          await ComponentService.getComponents(
+            selectedTubular.wellUid,
+            selectedTubular.wellboreUid,
+            selectedTubular.uid,
+            ComponentType.TubularComponent,
+            undefined,
+            abortController.signal
+          )
+        );
         setIsFetchingData(false);
       };
 
@@ -45,7 +66,11 @@ export const TubularView = (): React.ReactElement => {
     }
   }, [selectedTubular]);
 
-  const onContextMenu = (event: React.MouseEvent<HTMLLIElement>, {}, checkedTubularComponents: TubularComponentRow[]) => {
+  const onContextMenu = (
+    event: React.MouseEvent<HTMLLIElement>,
+    {},
+    checkedTubularComponents: TubularComponentRow[]
+  ) => {
     const contextMenuProps: TubularComponentContextMenuProps = {
       checkedTubularComponents,
       dispatchNavigation,
@@ -55,17 +80,35 @@ export const TubularView = (): React.ReactElement => {
       servers
     };
     const position = getContextMenuPosition(event);
-    dispatchOperation({ type: OperationType.DisplayContextMenu, payload: { component: <TubularComponentContextMenu {...contextMenuProps} />, position } });
+    dispatchOperation({
+      type: OperationType.DisplayContextMenu,
+      payload: {
+        component: <TubularComponentContextMenu {...contextMenuProps} />,
+        position
+      }
+    });
   };
 
   const columns: ContentTableColumn[] = [
     { property: "sequence", label: "sequence", type: ContentType.Number },
-    { property: "typeTubularComponent", label: "typeTubularComp", type: ContentType.String },
-    { property: "innerDiameter", label: "id", type: ContentType.String },
-    { property: "od", label: "od", type: ContentType.String },
-    { property: "len", label: "len", type: ContentType.String },
-    { property: "tubularName", label: "tubular.name", type: ContentType.String },
-    { property: "typeTubularAssy", label: "tubular.typeTubularAssy", type: ContentType.String },
+    {
+      property: "typeTubularComponent",
+      label: "typeTubularComp",
+      type: ContentType.String
+    },
+    { property: "innerDiameter", label: "id", type: ContentType.Measure },
+    { property: "od", label: "od", type: ContentType.Measure },
+    { property: "len", label: "len", type: ContentType.Measure },
+    {
+      property: "tubularName",
+      label: "tubular.name",
+      type: ContentType.String
+    },
+    {
+      property: "typeTubularAssy",
+      label: "tubular.typeTubularAssy",
+      type: ContentType.String
+    },
     { property: "uid", label: "uid", type: ContentType.String }
   ];
 
@@ -74,9 +117,15 @@ export const TubularView = (): React.ReactElement => {
       id: tubularComponent.uid,
       sequence: tubularComponent.sequence,
       typeTubularComponent: tubularComponent.typeTubularComponent,
-      innerDiameter: `${tubularComponent.id?.value?.toFixed(4)} ${tubularComponent.id?.uom}`,
-      od: `${tubularComponent.od?.value?.toFixed(4)} ${tubularComponent.od?.uom}`,
-      len: `${tubularComponent.len?.value?.toFixed(4)} ${tubularComponent.len?.uom}`,
+      innerDiameter: `${tubularComponent.id?.value?.toFixed(4)} ${
+        tubularComponent.id?.uom
+      }`,
+      od: `${tubularComponent.od?.value?.toFixed(4)} ${
+        tubularComponent.od?.uom
+      }`,
+      len: `${tubularComponent.len?.value?.toFixed(4)} ${
+        tubularComponent.len?.uom
+      }`,
       tubularName: selectedTubular?.name,
       typeTubularAssy: selectedTubular?.typeTubularAssy,
       uid: tubularComponent.uid,
@@ -84,7 +133,19 @@ export const TubularView = (): React.ReactElement => {
     };
   });
 
-  return selectedTubular && !isFetchingData ? <ContentTable columns={columns} data={tubularComponentRows} onContextMenu={onContextMenu} checkableRows /> : <></>;
+  return selectedTubular && !isFetchingData ? (
+    <ContentTable
+      viewId="tubularView"
+      columns={columns}
+      data={tubularComponentRows}
+      onContextMenu={onContextMenu}
+      checkableRows
+      showRefresh
+      downloadToCsvFileName={`Tubular_${selectedTubular.name}`}
+    />
+  ) : (
+    <></>
+  );
 };
 
 export default TubularView;

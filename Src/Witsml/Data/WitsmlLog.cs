@@ -5,18 +5,20 @@ using Witsml.Extensions;
 
 namespace Witsml.Data
 {
-    public class WitsmlLog : ObjectOnWellbore<WitsmlLogs>
+    public class WitsmlLog : WitsmlObjectOnWellbore
     {
-        public override WitsmlLogs AsSingletonWitsmlList()
+        public override WitsmlLogs AsItemInWitsmlList()
         {
             return new WitsmlLogs()
             {
-                Logs = this.AsSingletonList()
+                Logs = this.AsItemInList()
             };
         }
 
         public const string WITSML_INDEX_TYPE_MD = "measured depth";
         public const string WITSML_INDEX_TYPE_DATE_TIME = "date time";
+        public const string WITSML_DIRECTION_INCREASING = "increasing";
+        public const string WITSML_DIRECTION_DECREASING = "decreasing";
 
         [XmlElement("objectGrowing")]
         public string ObjectGrowing { get; set; }

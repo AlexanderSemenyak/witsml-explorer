@@ -9,45 +9,28 @@ import {
   UpdateServerListAction,
   UpdateWellAction,
   UpdateWellboreAction,
-  UpdateWellboreBhaRunsAction,
-  UpdateWellboreLogAction,
-  UpdateWellboreLogsAction,
-  UpdateWellboreMessageAction,
-  UpdateWellboreMessagesAction,
-  UpdateWellboreRigsAction,
-  UpdateWellboreRisksAction,
-  UpdateWellboreTrajectoriesAction,
-  UpdateWellboreTrajectoryAction,
-  UpdateWellboreTubularAction,
-  UpdateWellboreTubularsAction,
-  UpdateWellboreWbGeometryAction,
-  UpdateWellboreWbGeometrysAction,
+  UpdateWellboreObjectAction,
+  UpdateWellboreObjectsAction,
+  UpdateWellborePartialAction,
   UpdateWellsAction
-} from "./modificationActions";
+} from "contexts/modificationActions";
 import {
-  SelectBhaRunGroupAction,
+  CollapseTreeNodeChildrenAction,
+  ExpandTreeNodesAction,
   SelectJobsAction,
   SelectLogCurveInfoAction,
-  SelectLogGroupAction,
-  SelectLogObjectAction,
   SelectLogTypeAction,
-  SelectMessageGroupAction,
-  SelectRigGroupAction,
-  SelectRiskGroupAction,
+  SelectObjectAction,
+  SelectObjectGroupAction,
+  SelectObjectOnWellboreViewAction,
+  SelectQueryViewAction,
   SelectServerAction,
   SelectServerManagerAction,
-  SelectTrajectoryAction,
-  SelectTrajectoryGroupAction,
-  SelectTubularAction,
-  SelectTubularGroupAction,
-  SelectWbGeometryAction,
-  SelectWbGeometryGroupAction,
   SelectWellAction,
   SelectWellboreAction,
   SetCurveThresholdAction,
-  SetFilterAction,
   ToggleTreeNodeAction
-} from "./navigationActions";
+} from "contexts/navigationActions";
 
 export type NavigationAction =
   | AddServerAction
@@ -61,38 +44,23 @@ export type NavigationAction =
   | UpdateWellAction
   | UpdateWellsAction
   | UpdateWellboreAction
-  | UpdateWellboreBhaRunsAction
-  | UpdateWellboreLogAction
-  | UpdateWellboreLogsAction
-  | UpdateWellboreMessagesAction
-  | UpdateWellboreMessageAction
-  | UpdateWellboreRigsAction
-  | UpdateWellboreRisksAction
-  | UpdateWellboreTrajectoryAction
-  | UpdateWellboreTrajectoriesAction
-  | UpdateWellboreTubularAction
-  | UpdateWellboreTubularsAction
-  | UpdateWellboreWbGeometryAction
-  | UpdateWellboreWbGeometrysAction
+  | UpdateWellborePartialAction
+  | UpdateWellboreObjectAction
+  | UpdateWellboreObjectsAction
   | ToggleTreeNodeAction
+  | CollapseTreeNodeChildrenAction
+  | ExpandTreeNodesAction
   | SelectJobsAction
-  | SelectBhaRunGroupAction
+  | SelectQueryViewAction
   | SelectLogTypeAction
-  | SelectLogGroupAction
   | SelectLogCurveInfoAction
-  | SelectLogObjectAction
   | SelectWellAction
   | SelectWellboreAction
-  | SelectRigGroupAction
-  | SelectMessageGroupAction
-  | SelectRiskGroupAction
+  | SelectObjectAction
+  | SelectObjectGroupAction
   | SelectServerAction
-  | SelectTrajectoryAction
-  | SelectTrajectoryGroupAction
-  | SelectTubularAction
-  | SelectTubularGroupAction
-  | SelectWbGeometryGroupAction
-  | SelectWbGeometryAction
-  | SetFilterAction
   | SetCurveThresholdAction
-  | SelectServerManagerAction;
+  | SelectServerManagerAction
+  | SelectObjectOnWellboreViewAction;
+
+export type DispatchNavigation = (action: NavigationAction) => void;

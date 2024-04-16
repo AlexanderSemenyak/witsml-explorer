@@ -13,18 +13,17 @@ namespace WitsmlExplorer.Api.Services
 {
     public interface IRiskService
     {
-        Task<IEnumerable<Risk>> GetRisks(string wellUid, string wellboreUid);
+        Task<ICollection<Risk>> GetRisks(string wellUid, string wellboreUid);
     }
 
     public class RiskService : WitsmlService, IRiskService
     {
         public RiskService(IWitsmlClientProvider witsmlClientProvider) : base(witsmlClientProvider) { }
 
-        public async Task<IEnumerable<Risk>> GetRisks(string wellUid, string wellboreUid)
+        public async Task<ICollection<Risk>> GetRisks(string wellUid, string wellboreUid)
         {
             WitsmlRisks query = RiskQueries.GetWitsmlRiskByWellbore(wellUid, wellboreUid);
-            WitsmlRisks result = await _witsmlClient.GetFromStoreAsync(query, new OptionsIn(ReturnElements.All));
-
+            WitsmlRisks result = await _witsmlClient.GetFromStoreAsync(query, new OptionsIn(ReturnElements.Requested));
 
             return result.Risks.Select(risk =>
 
@@ -48,7 +47,6 @@ namespace WitsmlExplorer.Api.Services
                     SeverityLevel = risk.SeverityLevel,
                     ProbabilityLevel = risk.ProbabilityLevel,
                     Summary = risk.Summary,
-
                     Details = risk.Details,
                     CommonData = new CommonData()
                     {
@@ -57,7 +55,7 @@ namespace WitsmlExplorer.Api.Services
                         DTimLastChange = risk.CommonData.DTimLastChange,
                         DTimCreation = risk.CommonData.DTimCreation,
                     }
-                }).OrderBy(risk => risk.Name);
+                }).OrderBy(risk => risk.Name).ToList();
         }
     }
 }

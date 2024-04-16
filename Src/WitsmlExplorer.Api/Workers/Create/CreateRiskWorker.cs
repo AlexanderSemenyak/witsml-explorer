@@ -28,7 +28,7 @@ namespace WitsmlExplorer.Api.Workers.Create
             Risk risk = job.Risk;
             Verify(risk);
 
-            WitsmlRisks riskToCreate = RiskQueries.CreateRisk(risk);
+            WitsmlRisks riskToCreate = risk.ToWitsml();
 
             QueryResult result = await GetTargetWitsmlClientOrThrow().AddToStoreAsync(riskToCreate);
             if (result.IsSuccessful)
@@ -36,7 +36,7 @@ namespace WitsmlExplorer.Api.Workers.Create
                 await WaitUntilRiskHasBeenCreated(risk);
                 Logger.LogInformation("Risk created. {jobDescription}", job.Description());
                 WorkerResult workerResult = new(GetTargetWitsmlClientOrThrow().GetServerHostname(), true, $"Risk created ({risk.Name} [{risk.Uid}])");
-                RefreshWellbore refreshAction = new(GetTargetWitsmlClientOrThrow().GetServerHostname(), risk.WellUid, risk.Uid, RefreshType.Add);
+                RefreshObjects refreshAction = new(GetTargetWitsmlClientOrThrow().GetServerHostname(), risk.WellUid, risk.WellboreUid, EntityType.Risk);
                 return (workerResult, refreshAction);
             }
 

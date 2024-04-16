@@ -1,13 +1,22 @@
+import {
+  ContentTable,
+  ContentTableColumn,
+  ContentTableRow,
+  ContentType
+} from "components/ContentViews/table";
+import { getContextMenuPosition } from "components/ContextMenus/ContextMenu";
+import WbGeometrySectionContextMenu, {
+  WbGeometrySectionContextMenuProps
+} from "components/ContextMenus/WbGeometrySectionContextMenu";
+import NavigationContext from "contexts/navigationContext";
+import OperationContext from "contexts/operationContext";
+import OperationType from "contexts/operationType";
+import { ComponentType } from "models/componentType";
+import { measureToString } from "models/measure";
+import WbGeometryObject from "models/wbGeometry";
+import WbGeometrySection from "models/wbGeometrySection";
 import React, { useContext, useEffect, useState } from "react";
-import NavigationContext from "../../contexts/navigationContext";
-import OperationContext from "../../contexts/operationContext";
-import OperationType from "../../contexts/operationType";
-import { measureToString } from "../../models/measure";
-import WbGeometrySection from "../../models/wbGeometrySection";
-import WbGeometryService from "../../services/wbGeometryService";
-import { getContextMenuPosition } from "../ContextMenus/ContextMenu";
-import WbGeometrySectionContextMenu, { WbGeometrySectionContextMenuProps } from "../ContextMenus/WbGeometrySectionContextMenu";
-import { ContentTable, ContentTableColumn, ContentTableRow, ContentType } from "./table";
+import ComponentService from "services/componentService";
 
 interface WbGeometrySectionRow extends ContentTableRow {
   wbGeometrySection: WbGeometrySection;
@@ -15,10 +24,13 @@ interface WbGeometrySectionRow extends ContentTableRow {
 
 export const WbGeometryView = (): React.ReactElement => {
   const { navigationState } = useContext(NavigationContext);
-  const { selectedWbGeometry, selectedServer, servers } = navigationState;
-  const [wbGeometrySections, setWbGeometrySections] = useState<WbGeometrySection[]>([]);
+  const { selectedObject, selectedServer, servers } = navigationState;
+  const [wbGeometrySections, setWbGeometrySections] = useState<
+    WbGeometrySection[]
+  >([]);
   const { dispatchOperation } = useContext(OperationContext);
   const [isFetchingData, setIsFetchingData] = useState<boolean>(true);
+  const selectedWbGeometry = selectedObject as WbGeometryObject;
 
   useEffect(() => {
     setIsFetchingData(true);
@@ -27,7 +39,14 @@ export const WbGeometryView = (): React.ReactElement => {
 
       const getWbGeometry = async () => {
         setWbGeometrySections(
-          await WbGeometryService.getWbGeometrySections(selectedWbGeometry.wellUid, selectedWbGeometry.wellboreUid, selectedWbGeometry.uid, abortController.signal)
+          await ComponentService.getComponents(
+            selectedWbGeometry.wellUid,
+            selectedWbGeometry.wellboreUid,
+            selectedWbGeometry.uid,
+            ComponentType.WbGeometrySection,
+            undefined,
+            abortController.signal
+          )
         );
         setIsFetchingData(false);
       };
@@ -40,31 +59,51 @@ export const WbGeometryView = (): React.ReactElement => {
     }
   }, [selectedWbGeometry]);
 
-  const onContextMenu = (event: React.MouseEvent<HTMLLIElement>, {}, checkedWbGeometrySections: WbGeometrySectionRow[]) => {
+  const onContextMenu = (
+    event: React.MouseEvent<HTMLLIElement>,
+    {},
+    checkedWbGeometrySections: WbGeometrySectionRow[]
+  ) => {
     const contextMenuProps: WbGeometrySectionContextMenuProps = {
-      checkedWbGeometrySections: checkedWbGeometrySections.map((row) => row.wbGeometrySection),
+      checkedWbGeometrySections: checkedWbGeometrySections.map(
+        (row) => row.wbGeometrySection
+      ),
       dispatchOperation,
       wbGeometry: selectedWbGeometry,
       selectedServer,
       servers
     };
     const position = getContextMenuPosition(event);
-    dispatchOperation({ type: OperationType.DisplayContextMenu, payload: { component: <WbGeometrySectionContextMenu {...contextMenuProps} />, position } });
+    dispatchOperation({
+      type: OperationType.DisplayContextMenu,
+      payload: {
+        component: <WbGeometrySectionContextMenu {...contextMenuProps} />,
+        position
+      }
+    });
   };
 
   const columns: ContentTableColumn[] = [
     { property: "uid", label: "uid", type: ContentType.String },
-    { property: "typeHoleCasing", label: "typeHoleCasing", type: ContentType.String },
-    { property: "mdTop", label: "mdTop", type: ContentType.String },
-    { property: "mdBottom", label: "mdBottom", type: ContentType.String },
-    { property: "tvdTop", label: "tvdTop", type: ContentType.String },
-    { property: "tvdBottom", label: "tvdBottom", type: ContentType.String },
-    { property: "idSection", label: "idSection", type: ContentType.String },
-    { property: "odSection", label: "odSection", type: ContentType.String },
-    { property: "wtPerLen", label: "wtPerLen", type: ContentType.String },
+    {
+      property: "typeHoleCasing",
+      label: "typeHoleCasing",
+      type: ContentType.String
+    },
+    { property: "mdTop", label: "mdTop", type: ContentType.Measure },
+    { property: "mdBottom", label: "mdBottom", type: ContentType.Measure },
+    { property: "tvdTop", label: "tvdTop", type: ContentType.Measure },
+    { property: "tvdBottom", label: "tvdBottom", type: ContentType.Measure },
+    { property: "idSection", label: "idSection", type: ContentType.Measure },
+    { property: "odSection", label: "odSection", type: ContentType.Measure },
+    { property: "wtPerLen", label: "wtPerLen", type: ContentType.Measure },
     { property: "grade", label: "grade", type: ContentType.String },
-    { property: "curveConductor", label: "curveConductor", type: ContentType.String },
-    { property: "diaDrift", label: "diaDrift", type: ContentType.String },
+    {
+      property: "curveConductor",
+      label: "curveConductor",
+      type: ContentType.String
+    },
+    { property: "diaDrift", label: "diaDrift", type: ContentType.Measure },
     { property: "factFric", label: "factFric", type: ContentType.Number }
   ];
 
@@ -81,14 +120,31 @@ export const WbGeometryView = (): React.ReactElement => {
       odSection: measureToString(wbGeometrySection.odSection),
       wtPerLen: measureToString(wbGeometrySection.wtPerLen),
       grade: wbGeometrySection.grade,
-      curveConductor: wbGeometrySection.curveConductor == null ? null : wbGeometrySection.curveConductor ? "true" : "false",
+      curveConductor:
+        wbGeometrySection.curveConductor == null
+          ? null
+          : wbGeometrySection.curveConductor
+          ? "true"
+          : "false",
       diaDrift: measureToString(wbGeometrySection.diaDrift),
       factFric: wbGeometrySection.factFric,
       wbGeometrySection
     };
   });
 
-  return selectedWbGeometry && !isFetchingData ? <ContentTable columns={columns} data={wbGeometrySectionRows} onContextMenu={onContextMenu} checkableRows /> : <></>;
+  return selectedWbGeometry && !isFetchingData ? (
+    <ContentTable
+      viewId="wbGeometryView"
+      columns={columns}
+      data={wbGeometrySectionRows}
+      onContextMenu={onContextMenu}
+      checkableRows
+      showRefresh
+      downloadToCsvFileName={`WbGeometry_${selectedWbGeometry.name}`}
+    />
+  ) : (
+    <></>
+  );
 };
 
 export default WbGeometryView;

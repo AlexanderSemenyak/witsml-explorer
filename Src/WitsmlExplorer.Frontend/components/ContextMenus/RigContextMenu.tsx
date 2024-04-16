@@ -1,71 +1,77 @@
 ﻿import { Typography } from "@equinor/eds-core-react";
-import { Divider, ListItemIcon, MenuItem } from "@material-ui/core";
-import React from "react";
-import { DisplayModalAction, HideContextMenuAction, HideModalAction } from "../../contexts/operationStateReducer";
-import OperationType from "../../contexts/operationType";
-import { ObjectType } from "../../models/objectType";
-import { Server } from "../../models/server";
-import Wellbore from "../../models/wellbore";
-import { JobType } from "../../services/jobService";
-import { colors } from "../../styles/Colors";
-import { RigRow } from "../ContentViews/RigsListView";
-import { PropertiesModalMode } from "../Modals/ModalParts";
-import RigPropertiesModal, { RigPropertiesModalProps } from "../Modals/RigPropertiesModal";
-import ContextMenu from "./ContextMenu";
-import { menuItemText, onClickDeleteObjects, onClickShowGroupOnServer, StyledIcon } from "./ContextMenuUtils";
-import { copyObjectOnWellbore, pasteObjectOnWellbore } from "./CopyUtils";
-import NestedMenuItem from "./NestedMenuItem";
-import { useClipboardReferencesOfType } from "./UseClipboardReferences";
+import { Divider, MenuItem } from "@material-ui/core";
+import { BatchModifyMenuItem } from "components/ContextMenus/BatchModifyMenuItem";
+import ContextMenu from "components/ContextMenus/ContextMenu";
+import { StyledIcon } from "components/ContextMenus/ContextMenuUtils";
+import {
+  ObjectContextMenuProps,
+  ObjectMenuItems
+} from "components/ContextMenus/ObjectMenuItems";
+import { PropertiesModalMode } from "components/Modals/ModalParts";
+import RigPropertiesModal, {
+  RigPropertiesModalProps
+} from "components/Modals/RigPropertiesModal";
+import NavigationContext from "contexts/navigationContext";
+import OperationContext from "contexts/operationContext";
+import OperationType from "contexts/operationType";
+import { useOpenInQueryView } from "hooks/useOpenInQueryView";
+import { ObjectType } from "models/objectType";
+import Rig from "models/rig";
+import React, { useContext } from "react";
+import { colors } from "styles/Colors";
 
-export interface RigContextMenuProps {
-  checkedRigRows: RigRow[];
-  dispatchOperation: (action: DisplayModalAction | HideContextMenuAction | HideModalAction) => void;
-  wellbore: Wellbore;
-  servers: Server[];
-  selectedServer: Server;
-}
-
-const RigContextMenu = (props: RigContextMenuProps): React.ReactElement => {
-  const { checkedRigRows, dispatchOperation, wellbore, servers, selectedServer } = props;
-  const rigReferences = useClipboardReferencesOfType(ObjectType.Rig);
-  const rigs = checkedRigRows.map((row) => row.rig);
+const RigContextMenu = (props: ObjectContextMenuProps): React.ReactElement => {
+  const { checkedObjects, wellbore } = props;
+  const { navigationState, dispatchNavigation } = useContext(NavigationContext);
+  const { dispatchOperation } = useContext(OperationContext);
+  const openInQueryView = useOpenInQueryView();
 
   const onClickModify = async () => {
-    const mode = PropertiesModalMode.Edit;
-    const modifyRigObjectProps: RigPropertiesModalProps = { mode, rig: checkedRigRows[0].rig, dispatchOperation };
-    dispatchOperation({ type: OperationType.DisplayModal, payload: <RigPropertiesModal {...modifyRigObjectProps} /> });
     dispatchOperation({ type: OperationType.HideContextMenu });
+    const mode = PropertiesModalMode.Edit;
+    const modifyRigObjectProps: RigPropertiesModalProps = {
+      mode,
+      rig: checkedObjects[0] as Rig,
+      dispatchOperation
+    };
+    dispatchOperation({
+      type: OperationType.DisplayModal,
+      payload: <RigPropertiesModal {...modifyRigObjectProps} />
+    });
+  };
+
+  const extraMenuItems = (): React.ReactElement[] => {
+    return [
+      <Divider key={"divider"} />,
+      <BatchModifyMenuItem
+        key="batchModify"
+        checkedObjects={checkedObjects}
+        objectType={ObjectType.Rig}
+      />,
+      <MenuItem
+        key={"properties"}
+        onClick={onClickModify}
+        disabled={checkedObjects.length !== 1}
+      >
+        <StyledIcon name="settings" color={colors.interactive.primaryResting} />
+        <Typography color={"primary"}>Properties</Typography>
+      </MenuItem>
+    ];
   };
 
   return (
     <ContextMenu
       menuItems={[
-        <MenuItem key={"copy"} onClick={() => copyObjectOnWellbore(selectedServer, rigs, dispatchOperation, ObjectType.Rig)} disabled={rigs.length === 0}>
-          <StyledIcon name="copy" color={colors.interactive.primaryResting} />
-          <Typography color={"primary"}>{menuItemText("copy", "rig", rigs)}</Typography>
-        </MenuItem>,
-        <MenuItem key={"paste"} onClick={() => pasteObjectOnWellbore(servers, rigReferences, dispatchOperation, wellbore, JobType.CopyRig)} disabled={rigReferences === null}>
-          <StyledIcon name="paste" color={colors.interactive.primaryResting} />
-          <Typography color={"primary"}>{menuItemText("paste", "rig", rigReferences?.objectUids)}</Typography>
-        </MenuItem>,
-        <MenuItem key={"delete"} onClick={() => onClickDeleteObjects(dispatchOperation, rigs, ObjectType.Rig, JobType.DeleteRigs)} disabled={checkedRigRows.length === 0}>
-          <ListItemIcon>
-            <StyledIcon name="deleteToTrash" color={colors.interactive.primaryResting} />
-          </ListItemIcon>
-          <Typography color="primary">{menuItemText("delete", "rig", rigs)}</Typography>
-        </MenuItem>,
-        <NestedMenuItem key={"showOnServer"} label={"Show on server"}>
-          {servers.map((server: Server) => (
-            <MenuItem key={server.name} onClick={() => onClickShowGroupOnServer(dispatchOperation, server, wellbore, "rigGroupUid")}>
-              <Typography color={"primary"}>{server.name}</Typography>
-            </MenuItem>
-          ))}
-        </NestedMenuItem>,
-        <Divider key={"divider"} />,
-        <MenuItem key={"properties"} onClick={onClickModify} disabled={checkedRigRows.length !== 1}>
-          <StyledIcon name="settings" color={colors.interactive.primaryResting} />
-          <Typography color={"primary"}>Properties</Typography>
-        </MenuItem>
+        ...ObjectMenuItems(
+          checkedObjects,
+          ObjectType.Rig,
+          navigationState,
+          dispatchOperation,
+          dispatchNavigation,
+          openInQueryView,
+          wellbore,
+          extraMenuItems()
+        )
       ]}
     />
   );

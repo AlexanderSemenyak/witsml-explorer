@@ -1,36 +1,77 @@
 import { Typography } from "@equinor/eds-core-react";
-import { Divider, ListItemIcon, MenuItem } from "@material-ui/core";
-import React from "react";
+import { Divider, MenuItem } from "@material-ui/core";
+import {
+  ObjectTypeToTemplateObject,
+  StoreFunction,
+  TemplateObjects
+} from "components/ContentViews/QueryViewUtils";
+import { WellboreRow } from "components/ContentViews/WellboresListView";
+import ContextMenu from "components/ContextMenus/ContextMenu";
+import {
+  StyledIcon,
+  menuItemText
+} from "components/ContextMenus/ContextMenuUtils";
+import { pasteObjectOnWellbore } from "components/ContextMenus/CopyUtils";
+import NestedMenuItem from "components/ContextMenus/NestedMenuItem";
+import { useClipboardReferences } from "components/ContextMenus/UseClipboardReferences";
+import ConfirmModal from "components/Modals/ConfirmModal";
+import DeleteEmptyMnemonicsModal, {
+  DeleteEmptyMnemonicsModalProps
+} from "components/Modals/DeleteEmptyMnemonicsModal";
+import LogPropertiesModal, {
+  IndexCurve,
+  LogPropertiesModalInterface
+} from "components/Modals/LogPropertiesModal";
+import MissingDataAgentModal, {
+  MissingDataAgentModalProps
+} from "components/Modals/MissingDataAgentModal";
+import { PropertiesModalMode } from "components/Modals/ModalParts";
+import WellborePropertiesModal, {
+  WellborePropertiesModalProps
+} from "components/Modals/WellborePropertiesModal";
+import ModificationType from "contexts/modificationType";
+import NavigationContext from "contexts/navigationContext";
+import { treeNodeIsExpanded } from "contexts/navigationStateReducer";
+import NavigationType from "contexts/navigationType";
+import OperationContext from "contexts/operationContext";
+import { DisplayModalAction } from "contexts/operationStateReducer";
+import OperationType from "contexts/operationType";
+import { useOpenInQueryView } from "hooks/useOpenInQueryView";
+import { DeleteWellboreJob } from "models/jobs/deleteJobs";
+import LogObject from "models/logObject";
+import { ObjectType } from "models/objectType";
+import { Server } from "models/server";
+import Well from "models/well";
+import Wellbore, { calculateWellboreNodeId } from "models/wellbore";
+import React, { useContext } from "react";
+import JobService, { JobType } from "services/jobService";
+import ObjectService from "services/objectService";
+import WellboreService from "services/wellboreService";
+import { colors } from "styles/Colors";
 import { v4 as uuid } from "uuid";
-import { UpdateWellboreAction } from "../../contexts/modificationActions";
-import ModificationType from "../../contexts/modificationType";
-import { DisplayModalAction, HideContextMenuAction, HideModalAction } from "../../contexts/operationStateReducer";
-import OperationType from "../../contexts/operationType";
-import { DeleteWellboreJob } from "../../models/jobs/deleteJobs";
-import LogObject from "../../models/logObject";
-import { Server } from "../../models/server";
-import Wellbore from "../../models/wellbore";
-import JobService, { JobType } from "../../services/jobService";
-import WellboreService from "../../services/wellboreService";
-import { colors } from "../../styles/Colors";
-import Icon from "../../styles/Icons";
-import ConfirmModal from "../Modals/ConfirmModal";
-import LogPropertiesModal, { IndexCurve, LogPropertiesModalInterface } from "../Modals/LogPropertiesModal";
-import { PropertiesModalMode } from "../Modals/ModalParts";
-import WellborePropertiesModal, { WellborePropertiesModalProps } from "../Modals/WellborePropertiesModal";
-import ContextMenu from "./ContextMenu";
-import NestedMenuItem from "./NestedMenuItem";
-import WellborePasteMenuItem from "./WellborePasteMenuItem";
 
 export interface WellboreContextMenuProps {
-  dispatchNavigation: (action: UpdateWellboreAction) => void;
-  dispatchOperation: (action: DisplayModalAction | HideContextMenuAction | HideModalAction) => void;
   wellbore: Wellbore;
-  servers?: Server[];
+  well: Well;
+  checkedWellboreRows?: WellboreRow[];
 }
 
-const WellboreContextMenu = (props: WellboreContextMenuProps): React.ReactElement => {
-  const { dispatchNavigation, dispatchOperation, wellbore, servers } = props;
+const WellboreContextMenu = (
+  props: WellboreContextMenuProps
+): React.ReactElement => {
+  const { wellbore, well, checkedWellboreRows } = props;
+  const {
+    dispatchNavigation,
+    navigationState: {
+      servers,
+      expandedTreeNodes,
+      selectedWell,
+      selectedWellbore
+    }
+  } = useContext(NavigationContext);
+  const { dispatchOperation } = useContext(OperationContext);
+  const openInQueryView = useOpenInQueryView();
+  const objectReferences = useClipboardReferences();
 
   const onClickNewWellbore = () => {
     const newWellbore: Wellbore = {
@@ -45,8 +86,15 @@ const WellboreContextMenu = (props: WellboreContextMenuProps): React.ReactElemen
       wellboreParentName: wellbore.name,
       wellborePurpose: "unknown"
     };
-    const wellborePropertiesModalProps: WellborePropertiesModalProps = { mode: PropertiesModalMode.New, wellbore: newWellbore, dispatchOperation };
-    const action: DisplayModalAction = { type: OperationType.DisplayModal, payload: <WellborePropertiesModal {...wellborePropertiesModalProps} /> };
+    const wellborePropertiesModalProps: WellborePropertiesModalProps = {
+      mode: PropertiesModalMode.New,
+      wellbore: newWellbore,
+      dispatchOperation
+    };
+    const action: DisplayModalAction = {
+      type: OperationType.DisplayModal,
+      payload: <WellborePropertiesModal {...wellborePropertiesModalProps} />
+    };
     dispatchOperation(action);
   };
 
@@ -60,12 +108,20 @@ const WellboreContextMenu = (props: WellboreContextMenuProps): React.ReactElemen
       wellboreName: wellbore.name,
       indexCurve: IndexCurve.Depth
     };
-    const logPropertiesModalProps: LogPropertiesModalInterface = { mode: PropertiesModalMode.New, logObject: newLog, dispatchOperation };
-    const action: DisplayModalAction = { type: OperationType.DisplayModal, payload: <LogPropertiesModal {...logPropertiesModalProps} /> };
+    const logPropertiesModalProps: LogPropertiesModalInterface = {
+      mode: PropertiesModalMode.New,
+      logObject: newLog,
+      dispatchOperation
+    };
+    const action: DisplayModalAction = {
+      type: OperationType.DisplayModal,
+      payload: <LogPropertiesModal {...logPropertiesModalProps} />
+    };
     dispatchOperation(action);
   };
 
   const deleteWellbore = async () => {
+    dispatchOperation({ type: OperationType.HideContextMenu });
     dispatchOperation({ type: OperationType.HideModal });
     const job: DeleteWellboreJob = {
       toDelete: {
@@ -76,7 +132,6 @@ const WellboreContextMenu = (props: WellboreContextMenuProps): React.ReactElemen
       }
     };
     await JobService.orderJob(JobType.DeleteWellbore, job);
-    dispatchOperation({ type: OperationType.HideContextMenu });
   };
 
   const onClickDelete = async () => {
@@ -85,7 +140,8 @@ const WellboreContextMenu = (props: WellboreContextMenuProps): React.ReactElemen
         heading={"Delete wellbore?"}
         content={
           <span>
-            This will permanently delete <strong>{wellbore.name}</strong> with uid: <strong>{wellbore.uid}</strong>
+            This will permanently delete <strong>{wellbore.name}</strong> with
+            uid: <strong>{wellbore.uid}</strong>
           </span>
         }
         onConfirm={deleteWellbore}
@@ -94,72 +150,246 @@ const WellboreContextMenu = (props: WellboreContextMenuProps): React.ReactElemen
         switchButtonPlaces={true}
       />
     );
-    dispatchOperation({ type: OperationType.DisplayModal, payload: confirmation });
+    dispatchOperation({
+      type: OperationType.DisplayModal,
+      payload: confirmation
+    });
+  };
+
+  const onClickDeleteEmptyMnemonics = async () => {
+    const deleteEmptyMnemonicsModalProps: DeleteEmptyMnemonicsModalProps = {
+      wellbores: [wellbore]
+    };
+    const action: DisplayModalAction = {
+      type: OperationType.DisplayModal,
+      payload: <DeleteEmptyMnemonicsModal {...deleteEmptyMnemonicsModalProps} />
+    };
+    dispatchOperation(action);
   };
 
   const onClickRefresh = async () => {
-    const refreshedWellbore = await WellboreService.getCompleteWellbore(wellbore.wellUid, wellbore.uid);
+    dispatchOperation({ type: OperationType.HideContextMenu });
+    // toggle the wellbore node and navigate to parent wellbore to reset the sidebar and content view
+    //   because we do not load in objects that have been loaded in before the refresh
+    const nodeId = calculateWellboreNodeId(wellbore);
+    if (treeNodeIsExpanded(expandedTreeNodes, nodeId)) {
+      dispatchNavigation({
+        type: NavigationType.CollapseTreeNodeChildren,
+        payload: { nodeId }
+      });
+    }
+    if (
+      selectedWell?.uid == well.uid &&
+      selectedWellbore?.uid == wellbore.uid
+    ) {
+      dispatchNavigation({
+        type: NavigationType.SelectWellbore,
+        payload: { well, wellbore }
+      });
+    }
+
+    const refreshedWellbore = await WellboreService.getWellbore(
+      wellbore.wellUid,
+      wellbore.uid
+    );
+    const objectCount = await ObjectService.getExpandableObjectsCount(wellbore);
     dispatchNavigation({
       type: ModificationType.UpdateWellbore,
-      payload: { wellbore: refreshedWellbore }
+      payload: { wellbore: { ...refreshedWellbore, objectCount } }
     });
-    dispatchOperation({ type: OperationType.HideContextMenu });
+  };
+
+  const onClickMissingDataAgent = () => {
+    const wellboreReferences = checkedWellboreRows?.map((row) => ({
+      wellUid: row.wellUid,
+      wellboreUid: row.uid,
+      wellName: row.wellName,
+      wellboreName: row.name
+    })) || [
+      {
+        wellUid: wellbore.wellUid,
+        wellboreUid: wellbore.uid,
+        wellName: wellbore.wellName,
+        wellboreName: wellbore.name
+      }
+    ];
+    const missingDataAgentModalProps: MissingDataAgentModalProps = {
+      wellReferences: [],
+      wellboreReferences: wellboreReferences
+    };
+    dispatchOperation({
+      type: OperationType.DisplayModal,
+      payload: <MissingDataAgentModal {...missingDataAgentModalProps} />
+    });
   };
 
   const onClickProperties = async () => {
     const controller = new AbortController();
-    const detailedWellbore = await WellboreService.getWellbore(wellbore.wellUid, wellbore.uid, controller.signal);
-    const wellborePropertiesModalProps: WellborePropertiesModalProps = { mode: PropertiesModalMode.Edit, wellbore: detailedWellbore, dispatchOperation };
-    dispatchOperation({ type: OperationType.DisplayModal, payload: <WellborePropertiesModal {...wellborePropertiesModalProps} /> });
+    const detailedWellbore = await WellboreService.getWellbore(
+      wellbore.wellUid,
+      wellbore.uid,
+      controller.signal
+    );
+    const wellborePropertiesModalProps: WellborePropertiesModalProps = {
+      mode: PropertiesModalMode.Edit,
+      wellbore: detailedWellbore,
+      dispatchOperation
+    };
+    dispatchOperation({
+      type: OperationType.DisplayModal,
+      payload: <WellborePropertiesModal {...wellborePropertiesModalProps} />
+    });
   };
 
   const onClickShowOnServer = async (server: Server) => {
+    dispatchOperation({ type: OperationType.HideContextMenu });
     const host = `${window.location.protocol}//${window.location.host}`;
     const wellboreUrl = `${host}/?serverUrl=${server.url}&wellUid=${wellbore.wellUid}&wellboreUid=${wellbore.uid}`;
     window.open(wellboreUrl);
-    dispatchOperation({ type: OperationType.HideContextMenu });
   };
 
   return (
     <ContextMenu
       menuItems={[
         <MenuItem key={"refreshwellbore"} onClick={onClickRefresh}>
-          <ListItemIcon>
-            <Icon name="refresh" color={colors.interactive.primaryResting} />
-          </ListItemIcon>
+          <StyledIcon
+            name="refresh"
+            color={colors.interactive.primaryResting}
+          />
           <Typography color={"primary"}>Refresh wellbore</Typography>
         </MenuItem>,
         <MenuItem key={"newwellbore"} onClick={onClickNewWellbore}>
-          <ListItemIcon>
-            <Icon name="add" color={colors.interactive.primaryResting} />
-          </ListItemIcon>
+          <StyledIcon name="add" color={colors.interactive.primaryResting} />
           <Typography color={"primary"}>New wellbore</Typography>
         </MenuItem>,
         <MenuItem key={"newlog"} onClick={onClickNewLog}>
-          <ListItemIcon>
-            <Icon name="add" color={colors.interactive.primaryResting} />
-          </ListItemIcon>
+          <StyledIcon name="add" color={colors.interactive.primaryResting} />
           <Typography color={"primary"}>New log</Typography>
         </MenuItem>,
-        <WellborePasteMenuItem key={"pasteMenu"} dispatchOperation={dispatchOperation} servers={servers} wellbore={wellbore} />,
+        <MenuItem
+          key={"paste"}
+          onClick={() =>
+            pasteObjectOnWellbore(
+              servers,
+              objectReferences,
+              dispatchOperation,
+              wellbore
+            )
+          }
+          disabled={objectReferences === null}
+        >
+          <StyledIcon name="paste" color={colors.interactive.primaryResting} />
+          <Typography color={"primary"}>
+            {menuItemText(
+              "paste",
+              objectReferences?.objectType ?? "",
+              objectReferences?.objectUids
+            )}
+          </Typography>
+        </MenuItem>,
         <MenuItem key={"deleteWellbore"} onClick={onClickDelete}>
-          <ListItemIcon>
-            <Icon name="deleteToTrash" color={colors.interactive.primaryResting} />
-          </ListItemIcon>
+          <StyledIcon
+            name="deleteToTrash"
+            color={colors.interactive.primaryResting}
+          />
           <Typography color={"primary"}>Delete</Typography>
+        </MenuItem>,
+        <MenuItem
+          key={"deleteEmptyMnemonics"}
+          onClick={onClickDeleteEmptyMnemonics}
+        >
+          <StyledIcon
+            name="deleteToTrash"
+            color={colors.interactive.primaryResting}
+          />
+          <Typography color={"primary"}>Delete empty mnemonics</Typography>
         </MenuItem>,
         <NestedMenuItem key={"showOnServer"} label={"Show on server"}>
           {servers.map((server: Server) => (
-            <MenuItem key={server.name} onClick={() => onClickShowOnServer(server)}>
+            <MenuItem
+              key={server.name}
+              onClick={() => onClickShowOnServer(server)}
+            >
               <Typography color={"primary"}>{server.name}</Typography>
             </MenuItem>
           ))}
         </NestedMenuItem>,
+        <NestedMenuItem key={"queryItems"} label={"Query"} icon="textField">
+          {[
+            <MenuItem
+              key={"openQuery"}
+              onClick={() =>
+                openInQueryView({
+                  templateObject: TemplateObjects.Wellbore,
+                  storeFunction: StoreFunction.GetFromStore,
+                  wellUid: well.uid,
+                  wellboreUid: wellbore.uid
+                })
+              }
+            >
+              <StyledIcon
+                name="textField"
+                color={colors.interactive.primaryResting}
+              />
+              <Typography color={"primary"}>Open in query view</Typography>
+            </MenuItem>,
+            <MenuItem
+              key={"newWellbore"}
+              onClick={() =>
+                openInQueryView({
+                  templateObject: TemplateObjects.Wellbore,
+                  storeFunction: StoreFunction.AddToStore,
+                  wellUid: well.uid,
+                  wellboreUid: uuid()
+                })
+              }
+            >
+              <StyledIcon
+                name="add"
+                color={colors.interactive.primaryResting}
+              />
+              <Typography color={"primary"}>New Wellbore</Typography>
+            </MenuItem>,
+            <NestedMenuItem
+              key={"newObjects"}
+              label={"New object"}
+              icon={"add"}
+            >
+              {Object.values(ObjectType).map((objectType) => (
+                <MenuItem
+                  key={objectType}
+                  onClick={() =>
+                    openInQueryView({
+                      templateObject: ObjectTypeToTemplateObject[objectType],
+                      storeFunction: StoreFunction.AddToStore,
+                      wellUid: well.uid,
+                      wellboreUid: wellbore.uid,
+                      objectUid: uuid()
+                    })
+                  }
+                >
+                  <StyledIcon
+                    name="add"
+                    color={colors.interactive.primaryResting}
+                  />
+                  <Typography
+                    color={"primary"}
+                  >{`New ${objectType}`}</Typography>
+                </MenuItem>
+              ))}
+            </NestedMenuItem>
+          ]}
+        </NestedMenuItem>,
+        <MenuItem key={"missingDataAgent"} onClick={onClickMissingDataAgent}>
+          <StyledIcon name="search" color={colors.interactive.primaryResting} />
+          <Typography color={"primary"}>Missing Data Agent</Typography>
+        </MenuItem>,
         <Divider key={"divider"} />,
         <MenuItem key={"properties"} onClick={onClickProperties}>
-          <ListItemIcon>
-            <Icon name="settings" color={colors.interactive.primaryResting} />
-          </ListItemIcon>
+          <StyledIcon
+            name="settings"
+            color={colors.interactive.primaryResting}
+          />
           <Typography color={"primary"}>Properties</Typography>
         </MenuItem>
       ]}
